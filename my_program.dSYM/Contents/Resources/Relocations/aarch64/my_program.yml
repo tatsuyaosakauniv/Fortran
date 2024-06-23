@@ -1,0 +1,40 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     my_program
+relocations:
+  - { offsetInCU: 0x124, offset: 0x124, size: 0x8, addend: 0x0, symName: ___molecules_module_MOD___copy_molecules_module_Mol_type, symObjAddr: 0x0, symBinAddr: 0x100001B28, symSize: 0x4C }
+  - { offsetInCU: 0x83, offset: 0x83, size: 0x8, addend: 0x0, symName: ___parameters_MOD_bunsi3, symObjAddr: 0x55C8, symBinAddr: 0x100007188, symSize: 0x0 }
+  - { offsetInCU: 0x9B, offset: 0x9B, size: 0x8, addend: 0x0, symName: ___parameters_MOD_eps33, symObjAddr: 0x55D8, symBinAddr: 0x100007198, symSize: 0x0 }
+  - { offsetInCU: 0xB5, offset: 0xB5, size: 0x8, addend: 0x0, symName: ___parameters_MOD_sig33, symObjAddr: 0x55F0, symBinAddr: 0x1000071B0, symSize: 0x0 }
+  - { offsetInCU: 0x1CD, offset: 0x1CD, size: 0x8, addend: 0x0, symName: ___variable_MOD_cforce, symObjAddr: 0x9140, symBinAddr: 0x10000C038, symSize: 0x0 }
+  - { offsetInCU: 0x1E1, offset: 0x1E1, size: 0x8, addend: 0x0, symName: ___variable_MOD_eps, symObjAddr: 0x9150, symBinAddr: 0x10000C048, symSize: 0x0 }
+  - { offsetInCU: 0x201, offset: 0x201, size: 0x8, addend: 0x0, symName: ___variable_MOD_nowstp, symObjAddr: 0x9158, symBinAddr: 0x10000C050, symSize: 0x0 }
+  - { offsetInCU: 0x215, offset: 0x215, size: 0x8, addend: 0x0, symName: ___variable_MOD_sig, symObjAddr: 0x9160, symBinAddr: 0x10000C058, symSize: 0x0 }
+  - { offsetInCU: 0x235, offset: 0x235, size: 0x8, addend: 0x0, symName: ___variable_MOD_xcutof, symObjAddr: 0x9168, symBinAddr: 0x10000C060, symSize: 0x0 }
+  - { offsetInCU: 0x24D, offset: 0x24D, size: 0x8, addend: 0x0, symName: ___variable_MOD_xsyul, symObjAddr: 0x9170, symBinAddr: 0x10000C068, symSize: 0x0 }
+  - { offsetInCU: 0x269, offset: 0x269, size: 0x8, addend: 0x0, symName: ___variable_MOD_ycutof, symObjAddr: 0x9178, symBinAddr: 0x10000C070, symSize: 0x0 }
+  - { offsetInCU: 0x281, offset: 0x281, size: 0x8, addend: 0x0, symName: ___variable_MOD_ysyul, symObjAddr: 0x9180, symBinAddr: 0x10000C078, symSize: 0x0 }
+  - { offsetInCU: 0x29D, offset: 0x29D, size: 0x8, addend: 0x0, symName: ___variable_MOD_zcutof, symObjAddr: 0x9188, symBinAddr: 0x10000C080, symSize: 0x0 }
+  - { offsetInCU: 0x2B5, offset: 0x2B5, size: 0x8, addend: 0x0, symName: ___variable_MOD_zmass, symObjAddr: 0x9190, symBinAddr: 0x10000C088, symSize: 0x0 }
+  - { offsetInCU: 0x2CF, offset: 0x2CF, size: 0x8, addend: 0x0, symName: ___variable_MOD_zsyul, symObjAddr: 0x91A0, symBinAddr: 0x10000C098, symSize: 0x0 }
+  - { offsetInCU: 0x3D6, offset: 0x3D6, size: 0x8, addend: 0x0, symName: ___molecules_module_MOD___def_init_molecules_module_Mol_type, symObjAddr: 0x5608, symBinAddr: 0x1000071C8, symSize: 0x0 }
+  - { offsetInCU: 0x3EA, offset: 0x3EA, size: 0x8, addend: 0x0, symName: ___molecules_module_MOD___vtab_molecules_module_Mol_type, symObjAddr: 0x5768, symBinAddr: 0x10000C000, symSize: 0x0 }
+  - { offsetInCU: 0x3CA, offset: 0x3CA, size: 0x8, addend: 0x0, symName: ___molecules_module_MOD_mol, symObjAddr: 0x91A8, symBinAddr: 0x10000C0A0, symSize: 0x0 }
+  - { offsetInCU: 0x420, offset: 0x420, size: 0x8, addend: 0x0, symName: ___molecules_module_MOD___copy_molecules_module_Mol_type, symObjAddr: 0x0, symBinAddr: 0x100001B28, symSize: 0x4C }
+  - { offsetInCU: 0x4E6, offset: 0x4E6, size: 0x8, addend: 0x0, symName: _MAIN__, symObjAddr: 0x728, symBinAddr: 0x100002250, symSize: 0x644 }
+  - { offsetInCU: 0x502, offset: 0x502, size: 0x8, addend: 0x0, symName: _record3.0, symObjAddr: 0x4C, symBinAddr: 0x100001B74, symSize: 0x6DC }
+  - { offsetInCU: 0x55F, offset: 0x55F, size: 0x8, addend: 0x0, symName: _record2.1, symObjAddr: 0xD6C, symBinAddr: 0x100002894, symSize: 0x2B8 }
+  - { offsetInCU: 0x5C0, offset: 0x5C0, size: 0x8, addend: 0x0, symName: _totene.10, symObjAddr: 0xC570, symBinAddr: 0x10000F468, symSize: 0x0 }
+  - { offsetInCU: 0x5D7, offset: 0x5D7, size: 0x8, addend: 0x0, symName: _totkin.11, symObjAddr: 0xC568, symBinAddr: 0x10000F460, symSize: 0x0 }
+  - { offsetInCU: 0x5EE, offset: 0x5EE, size: 0x8, addend: 0x0, symName: _totpot.12, symObjAddr: 0xC560, symBinAddr: 0x10000F458, symSize: 0x0 }
+  - { offsetInCU: 0x600, offset: 0x600, size: 0x8, addend: 0x0, symName: _record.2, symObjAddr: 0x1024, symBinAddr: 0x100002B4C, symSize: 0xA78 }
+  - { offsetInCU: 0x65C, offset: 0x65C, size: 0x8, addend: 0x0, symName: _bound.3, symObjAddr: 0x1A9C, symBinAddr: 0x1000035C4, symSize: 0xA28 }
+  - { offsetInCU: 0x69F, offset: 0x69F, size: 0x8, addend: 0x0, symName: _calcu.4, symObjAddr: 0x24C4, symBinAddr: 0x100003FEC, symSize: 0x1D80 }
+  - { offsetInCU: 0x8AF, offset: 0x8AF, size: 0x8, addend: 0x0, symName: _seting.8, symObjAddr: 0x4244, symBinAddr: 0x100005D6C, symSize: 0x1344 }
+  - { offsetInCU: 0x956, offset: 0x956, size: 0x8, addend: 0x0, symName: _ofstx1.16, symObjAddr: 0xC540, symBinAddr: 0x10000F438, symSize: 0x0 }
+  - { offsetInCU: 0x96C, offset: 0x96C, size: 0x8, addend: 0x0, symName: _ofsty1.14, symObjAddr: 0xC550, symBinAddr: 0x10000F448, symSize: 0x0 }
+  - { offsetInCU: 0x9DA, offset: 0x9DA, size: 0x8, addend: 0x0, symName: _x.15, symObjAddr: 0xC548, symBinAddr: 0x10000F440, symSize: 0x0 }
+  - { offsetInCU: 0x9F0, offset: 0x9F0, size: 0x8, addend: 0x0, symName: _y.13, symObjAddr: 0xC558, symBinAddr: 0x10000F450, symSize: 0x0 }
+  - { offsetInCU: 0xA06, offset: 0xA06, size: 0x8, addend: 0x0, symName: _z.17, symObjAddr: 0xC538, symBinAddr: 0x10000F430, symSize: 0x0 }
+  - { offsetInCU: 0xB5A, offset: 0xB5A, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x5588, symBinAddr: 0x1000070B0, symSize: 0x3C }
+...
