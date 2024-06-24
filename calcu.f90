@@ -6,7 +6,7 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
     integer :: i, j, k, i1, i2
     double precision :: div(3), dist
     double precision :: dit2, dit4, dit6, dit8, dit12, dit14
-    double precision :: ppp, force, accel(3)
+    double precision :: ppp, force, forVec(3)
     double precision :: vene(3), sumvene
     double precision :: rnd
 
@@ -17,6 +17,7 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
             typ(j)%mol(i)%kinet  = 0.0000d0
         end do
     end do
+    interForce(:,:) = 0.000d0
 
     ! PtのPhantom層はダンパー力とランダム力を付与
     do j = 1, TYPMOL
@@ -24,38 +25,40 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
             cycle
         end if
 
-        do i = int(nummol(j)/numz(j)) + 1, int(2 * nummol(j)/numz(j)) ! Phantom層のみ
+        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
             do k = 1, 3
                 rnd = Random() 
-                rforce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
-                dforce(i,k,j) = - DAMP * typ(j)%mol(i)%vel(k) * 1.000d+5 ! 速度の有次元化
-            end do  
+                ! ランダム力
+                rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
+                ! ダンパー力
+                dmpForce(i,k,j) = - DAMP * typ(j)%mol(i)%vel(k) * 1.000d+5 ! 速度の有次元化
+            end do
         end do
 
         ! ランダム力とダンパー力を追加
-        do i = int(nummol(j)/numz(j)) + 1, int(2 * nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
-            typ(j)%mol(i)%acc(:) = (rforce(i,:,j) + dforce(i,:,j)) / (MASS(j)*1.000d-26) * 1.000d-20
+        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
+            typ(j)%mol(i)%acc(:) = (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3
         end do
     end do
 
     ! 分子間の相互作用力 → ポテンシャルエネルギー
     ! 同じ分子同士の影響
-    do i = 1, TYPMOL
-        do i1 = 1, nummol(i)
-            do i2 = i1+1, nummol(i)
-                div(:) = typ(i)%mol(i1)%pos(:) - typ(i)%mol(i2)%pos(:)
+    do j = 1, TYPMOL
+        do i1 = 1, nummol(j)
+            do i2 = i1+1, nummol(j)
+                div(:) = typ(j)%mol(i1)%pos(:) - typ(j)%mol(i2)%pos(:)
 
                 ! カットオフ
-                do j = 1, 3
-                    if (div(j) < -cutof(j)) then
-                        div(j) = div(j) + syul(j)
-                    else if(div(j) > cutof(j)) then
-                        div(j) = div(j) - syul(j)
+                do k = 1, 3
+                    if (div(k) < -cutof(k)) then
+                        div(k) = div(k) + syul(k)
+                    else if(div(k) > cutof(k)) then
+                        div(k) = div(k) - syul(k)
                     endif
     
-                    div(j) = div(j) / SIG(i)
+                    div(k) = div(k) / SIG(j)
 
-                    if (abs(div(j)) > CUTOFF) then
+                    if (abs(div(k)) > CUTOFF) then
                         cycle
                     endif
                 end do
@@ -72,37 +75,37 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
                 dit8   = dit4*dit4
                 dit12  = dit6*dit6
                 dit14  = dit8*dit6
-                ppp    = 4.00d0*EPS(i)*(1.00d0/dit12-1.00d0/dit6)
-                typ(i)%mol(i1)%poten = typ(i)%mol(i1)%poten + ppp*0.500d0
-                typ(i)%mol(i2)%poten = typ(i)%mol(i2)%poten + ppp*0.500d0
+                ppp    = 4.00d0*EPS(j)*(1.00d0/dit12-1.00d0/dit6)
+                typ(j)%mol(i1)%poten = typ(j)%mol(i1)%poten + ppp*0.500d0
+                typ(j)%mol(i2)%poten = typ(j)%mol(i2)%poten + ppp*0.500d0
 
-                force  = forCoef(i)*(-2.00d0/dit14+1.00d0/dit8)
-                accel(:) = -force*div(:)/MASS(i)
-                typ(i)%mol(i1)%acc(:) = typ(i)%mol(i1)%acc(:) + accel(:)
-                typ(i)%mol(i2)%acc(:) = typ(i)%mol(i2)%acc(:) - accel(:)
+                force  = forCoef(j)*(-2.00d0/dit14+1.00d0/dit8)
+                forVec(:) = -force*div(:)
+                typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
+                typ(j)%mol(i2)%acc(:) = typ(j)%mol(i2)%acc(:) - forVec(:)/MASS(j)
             end do
         end do
     end do
 
     ! 異なる分子同士の影響  ! Ar-Ptの処理    配列は1が上Pt, 2がAr, 3がしたPt
-    do i = 1, TYPMOL
-        if(i == 2) then
+    do j = 1, TYPMOL
+        if(j == 2) then
             cycle
         end if
-        do i1 = 1, nummol(i)       ! Pt
+        do i1 = 1, nummol(j)       ! Pt
             do i2 = 1, nummol(2)    ! Ar
-                div(:) = typ(i)%mol(i1)%pos(:) - typ(2)%mol(i2)%pos(:)
+                div(:) = typ(j)%mol(i1)%pos(:) - typ(2)%mol(i2)%pos(:)
 
-                do j = 1, 3
-                    if (div(j) < -cutof(j)) then
-                        div(j) = div(j) + syul(j)
-                    else if(div(j) > cutof(j)) then
-                        div(j) = div(j) - syul(j)
+                do k = 1, 3
+                    if (div(k) < -cutof(k)) then
+                        div(k) = div(k) + syul(k)
+                    else if(div(k) > cutof(k)) then
+                        div(k) = div(k) - syul(k)
                     endif
     
-                    div(j) = div(j) / SIG(i)
+                    div(k) = div(k) / SIG(j)
 
-                    if (abs(div(j)) > CUTOFF) then
+                    if (abs(div(k)) > CUTOFF) then
                         cycle
                     endif
                 end do
@@ -119,15 +122,17 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
                 dit8   = dit4*dit4
                 dit12  = dit6*dit6
                 dit14  = dit8*dit6
-                ppp    = angCon*4.00d0*EPS(4)*(1.00d0/dit12-1.00d0/dit6)    ! 異分子間ではangCon(接触角)を忘れずに
-                typ(i)%mol(i1)%poten = typ(i)%mol(i1)%poten + ppp*0.500d0
+                ppp    = angCon*4.00d0*EPS(4)*(1.00d0/dit12-1.00d0/dit6) ! 異分子間ではangCon(接触角)を忘れずに
+                typ(j)%mol(i1)%poten = typ(j)%mol(i1)%poten + ppp*0.500d0
                 typ(2)%mol(i2)%poten = typ(2)%mol(i2)%poten + ppp*0.500d0
 
                 force  = forCoef(4)*(-2.00d0/dit14+1.00d0/dit8)
-                accel(:) = -force*div(:)/MASS(i)
-                typ(i)%mol(i1)%acc(:) = typ(i)%mol(i1)%acc(:) + accel(:)
-                accel(:) = -force*div(:)/MASS(2)
-                typ(2)%mol(i2)%acc(:) = typ(2)%mol(i2)%acc(:) - accel(:)
+                do k = 1, 3
+                    forVec(k) = -force*div(k)
+                    interForce(i1,k) = interForce(i1,k) + forVec(k) ! 無次元なことに注意
+                end do
+                typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
+                typ(2)%mol(i2)%acc(:) = typ(2)%mol(i2)%acc(:) - forVec(:)/MASS(2)
             end do
         end do
     end do
@@ -148,7 +153,7 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
 
     ! Ptの計算
     do j = 1, TYPMOL
-        if(j == 2) then     ! Arの場合を除外
+        if(j == 2) then ! Arの場合を除外
             cycle
         end if
 
@@ -179,17 +184,33 @@ subroutine calc_heatFlux
     implicit none
     integer :: i, j, k
 
-    heatAmount(:) = 0.000d0
+    heatPhantom(:) = 0.000d0
+    heatSl_Lq = 0.000d0
+
     do j = 1, TYPMOL
         if (j == 2) then
             cycle
         else
             do k = 1, 3
-                do i = int(nummol(j)/numz(j)) + 1, int(2 * nummol(j)/numz(j))                     ! 速さの有次元化 10^5
-                    heatAmount(j) = heatAmount(j) + (rforce(i,k,j) + dforce(i,k,j)) * typ(j)%mol(i)%vel(k) * 1.000d+5
+                do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層              ! 速さの有次元化 10^5
+                    heatPhantom(j) = heatPhantom(j) + (rndForce(i,k,j) + dmpForce(i,k,j))*typ(j)%mol(i)%vel(k)*1.000d+5
                 end do
             end do
-            heatAmount(j) = heatAmount(j) / (areaPt * 1.000d-20) ! 面積の有次元化 10^-20
+                    heatPhantom(j) = heatPhantom(j) / (areaPt * 1.000d-20) ! 面積の有次元化 10^-20
+        end if
+    end do
+
+    do j = 1, TYPMOL
+        if (j == 2) then
+            cycle
+        else
+            do k = 1, 3
+                !do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
+                do i = 1, nummol(2)
+                    heatSl_Lq(j) = heatSl_Lq(j) + interForce(i,k)*1.000d-10*typ(j)%mol(i)%vel(k)*1.000d+5
+                end do
+            end do
+                    heatSl_Lq(j) = heatSl_Lq(j) / (areaPt * 1.000d-20)
         end if
     end do
 

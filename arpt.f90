@@ -16,36 +16,36 @@ program main
         !open(2,file='random1.dat', status='old')
 
         !open(6,*) は使用できない
-    ! 各分子の位置データの出力
-        open(10,file='posit_PtUp.dat')
-        open(11,file='posit_Ar.dat')
-        open(12,file='posit_PtLw.dat')
+    ! aaa
+        open(10,file='出力ファイル/posit_PtUp.dat')
+        open(11,file='出力ファイル/posit_Ar.dat')
+        open(12,file='出力ファイル/posit_PtLw.dat')
     ! 可視化用のpvch.fを移植 
-        open(15,file='pos.dat')
+        open(15,file='出力ファイル/pos.dat')
     ! 各分子の速度データの出力
-        open(20,file='veloc_PtUp.dat')
-        open(21,file='veloc_Ar.dat')
-        open(22,file='veloc_PtLw.dat')
+        open(20,file='出力ファイル/veloc_PtUp.dat')
+        open(21,file='出力ファイル/veloc_Ar.dat')
+        open(22,file='出力ファイル/veloc_PtLw.dat')
     ! 系のエネルギーデータの出力
-        open(30,file='energy_PtUp.dat')
-        open(31,file='energy_Ar.dat')
-        open(32,file='energy_PtLw.dat')
-        open(35,file='energy_all.dat')
+        open(30,file='出力ファイル/energy_PtUp.dat')
+        open(31,file='出力ファイル/energy_Ar.dat')
+        open(32,file='出力ファイル/energy_PtLw.dat')
+        open(35,file='出力ファイル/energy_all.dat')
     ! 系の温度データの出力
-        open(40,file='tempe.dat')
-        open(41,file='tempe_PtUp_Layer.dat')
-        open(42,file='tempe_PtLw_Layer.dat')
+        open(40,file='出力ファイル/tempe.dat')
+        open(41,file='出力ファイル/tempe_PtUp_Layer.dat')
+        open(42,file='出力ファイル/tempe_PtLw_Layer.dat')
     ! 系の周期長さの出力
-        open(50,file='syuuki.dat')
+        open(50,file='出力ファイル/syuuki.dat')
     ! 熱流束のデータ
-        open(60,file='heatflux.dat')
+        open(60,file='出力ファイル/heatflux.dat')
         
-        open(70,file='force.dat')
+        open(70,file='出力ファイル/force.dat')
 
     ! 各分子の最終位置データの出力
-        open(80,file='finpos.dat')
+        open(80,file='出力ファイル/finpos.dat')
     !　分子の色
-        open(90,file='mask.dat')
+        open(90,file='出力ファイル/mask.dat')
 
     write(15,'(3I7)') moltype, tlnkoss, ndat
     do i = 1,ndat
@@ -74,6 +74,7 @@ program main
     write(6, '(A17, F7.4, A2)') 'Measure Time: ', timeMeasure, 'ns'
     write(6,*) ''
     write(6,'(A16)') '- Scaling Step -'
+    write(6,*) ''
     
     
     stpNow = 0
@@ -85,10 +86,14 @@ program main
 
         ! ターミナルに表示
         if(stpNow == stpScaling) then
+            write(6,*) ''
             write(6,'(A19)') '- Relaxation Step -'
+            write(6,*) ''
         end if
         if(stpNow == stpScaling+stpRelax) then
+            write(6,*) ''
             write(6,'(A16)') '- Measure Step -'
+            write(6,*) ''
         end if
 
         ! ステップ数が500の倍数のとき
@@ -107,18 +112,18 @@ program main
         if (stpNow >= stpMeasure) then
             call calc_heatFlux
             if(mod(stpNow, 100) == 1) then
-                call record_heatflux ! 
+                call record_heatflux ! 熱流束を記録
             end if
         end if
         
         ! ステップ数が100の倍数+1のとき
         if(mod(stpNow, 100) == 1) then
-          call record_pos_vel ! データの出力１
-          call record_energy_temp ! データの出力２
+          call record_pos_vel ! 位置，速度を記録
+          call record_energy_temp ! エネルギー，温度を記録
         end if
     end do
 
-    call record_finpos_vel ! データの出力３
+    call record_finpos_vel ! 最終状態の分子の位置と速度を記録
 
     contains
     subroutine seting ! 各分子の初期位置，初期速度などの設定

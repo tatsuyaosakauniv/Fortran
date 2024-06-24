@@ -1,4 +1,3 @@
-! パラメータ（もともとparate.datにあったもの）
 module parameters
     implicit none
 !--------------- よく変更する---------------------!
@@ -71,15 +70,17 @@ module variable
     double precision :: syul(3) ! ポテンシャルのカットオフ長さx,y,z方向，x,y,z方向の周期長さ
 
     ! Langevin法
-    double precision :: rforce(nummol(1), 3, TYPMOL)   ! ランダム力用
-    double precision :: dforce(nummol(1), 3, TYPMOL)   ! ダンパー力用
+    double precision :: rndForce(nummol(1), 3, TYPMOL)   ! ランダム力用
+    double precision :: dmpForce(nummol(1), 3, TYPMOL)   ! ダンパー力用
     double precision :: stddev ! 標準偏差
     double precision :: rnd_2
     logical :: isOdd = .true. ! 乱数のsinとcosを交互に出すためのフラグ
 
     ! 熱流束
-    double precision :: heatAmount(TYPMOL) ! 熱輸送量
-    double precision :: heatFluxPt ! 熱流束
+    double precision :: interForce(nummol(2), 3) ! 熱流束を計算するための相互作用力
+    double precision :: heatPhantom(TYPMOL) ! Phantom層からの熱輸送量
+    double precision :: heatSl_Lq(TYPMOL) ! 固液界面での熱輸送量
+    double precision :: fluxPt ! 熱流束
     double precision :: tempLayer(numz(1),TYPMOL) ! Arは使わない
     ! double precision :: tempLayerLw(numz(3))
 

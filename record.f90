@@ -1,4 +1,4 @@
-subroutine record_pos_vel! データの出力１
+subroutine record_pos_vel ! 位置，速度を記録
     use parameters
     use variable
     use molecules_struct
@@ -25,7 +25,7 @@ subroutine record_pos_vel! データの出力１
     end do
 
     do i = int(nummol(1)/numz(1)) + 1, int(nummol(1) *2/numz(1))
-        write(70, '(6E15.7)') rforce(i,1,1), rforce(i,2,1), rforce(i,3,1), dforce(i,1,1), dforce(i,2,1), dforce(i,3,1)
+        write(70, '(9E15.7)') rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1), interForce(i,1), interForce(i,2), interForce(i,3)
     end do
 
     ! 可視化用
@@ -37,9 +37,10 @@ subroutine record_pos_vel! データの出力１
     end do
 end subroutine record_pos_vel
 
-subroutine record_energy_temp ! データの出力２
+subroutine record_energy_temp ! エネルギー，温度を記録
     use parameters
     use variable
+    use molecules_struct
     implicit none
     double precision, dimension(TYPMOL) :: totEne, totPot, totKin, temp
     double precision :: allEne, allPot, allKin, kintmp
@@ -106,16 +107,16 @@ subroutine record_energy_temp ! データの出力２
     write(42, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayer(1,3), tempLayer(2,3), tempLayer(3,3), tempLayer(4,3)
 end subroutine record_energy_temp
 
-subroutine record_heatflux
+subroutine record_heatflux ! 熱流束を記録
     use parameters
     use variable
     use molecules_struct
     implicit none
 
-    write(60,'(I6, 4E15.7)') (stpNow+99)*int(dt), heatAmount(1), heatAmount(2), heatAmount(3)
+    write(60,'(I6, 4E15.7)') (stpNow+99)*int(dt), heatPhantom(1), heatPhantom(3), heatSl_Lq(1), heatSl_Lq(3)
 end subroutine record_heatflux
 
-subroutine record_finpos_vel
+subroutine record_finpos_vel ! 最終状態の分子の位置と速度を記録
     use parameters
     use variable
     use molecules_struct
