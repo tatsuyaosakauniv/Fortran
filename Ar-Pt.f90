@@ -171,7 +171,7 @@ program main
         !open(2,file='random1.dat', status='old')
 
         !open(6,*) は使用できない
-    ! aaa
+    ! 各分子の位置データの出力
         open(10,file='出力ファイル/posit_PtUp.dat')
         open(11,file='出力ファイル/posit_Ar.dat')
         open(12,file='出力ファイル/posit_PtLw.dat')

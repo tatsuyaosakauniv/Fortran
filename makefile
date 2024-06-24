@@ -7,7 +7,7 @@ FC = gfortran
 FFLAGS = -Jbuild -Ibuild
 
 # ソースファイル
-SRCS = para.f90 calcu.f90 record.f90 arpt.f90
+SRCS = para.f90 calcu.f90 record.f90 main.f90
 
 # オブジェクトファイル
 OBJS = $(patsubst %.f90,build/%.o,$(SRCS))
@@ -16,7 +16,7 @@ OBJS = $(patsubst %.f90,build/%.o,$(SRCS))
 EXEC = test
 
 # デフォルトターゲット
-all: $(EXEC)
+all: build $(EXEC)
 
 # 実行ファイルの生成ルール
 $(EXEC): $(OBJS)
@@ -26,6 +26,10 @@ $(EXEC): $(OBJS)
 build/%.o: %.f90
 	$(FC) $(FFLAGS) -c $< -o $@
 
+# build ディレクトリが存在しない場合に作成するルール
+build:
+	mkdir -p build
+
 # クリーンアップルール
 clean:
 	rm -f build/*.o build/*.mod $(EXEC)
@@ -34,4 +38,4 @@ clean:
 run: $(EXEC)
 	./$(EXEC)
 
-.PHONY: all clean run
+.PHONY: all clean run build
