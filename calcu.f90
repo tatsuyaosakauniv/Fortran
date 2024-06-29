@@ -19,28 +19,6 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
     end do
     interForce(:,:) = 0.000d0
 
-    ! PtのPhantom層はダンパー力とランダム力を付与
-    do j = 1, TYPMOL
-        if(j == 2) then
-            cycle
-        end if
-
-        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
-            do k = 1, 3
-                rnd = Random() 
-                ! ランダム力
-                rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
-                ! ダンパー力
-                dmpForce(i,k,j) = - DAMP * typ(j)%mol(i)%vel(k) * 1.000d+5 ! 速度の有次元化
-            end do
-        end do
-
-        ! ランダム力とダンパー力を追加
-        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
-            typ(j)%mol(i)%acc(:) = (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3
-        end do
-    end do
-
     ! 分子間の相互作用力 → ポテンシャルエネルギー
     ! 同じ分子同士の影響
     do j = 1, TYPMOL
@@ -103,7 +81,7 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
                         div(k) = div(k) - syul(k)
                     endif
     
-                    div(k) = div(k) / SIG(j)
+                    div(k) = div(k) / SIG(4)
 
                     if (abs(div(k)) > CUTOFF) then
                         cycle
@@ -127,53 +105,67 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
                 typ(2)%mol(i2)%poten = typ(2)%mol(i2)%poten + ppp*0.500d0
 
                 force  = forCoef(4)*(-2.00d0/dit14+1.00d0/dit8)
-                do k = 1, 3
-                    forVec(k) = -force*div(k)
-                    interForce(i1,k) = interForce(i1,k) + forVec(k) ! 無次元なことに注意
-                end do
+                forVec(:) = -force*div(:)
+                interForce(i1,j) = interForce(i1,j) - forVec(3) ! 無次元なことに注意　符号が逆な気がする
+
                 typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
                 typ(2)%mol(i2)%acc(:) = typ(2)%mol(i2)%acc(:) - forVec(:)/MASS(2)
             end do
         end do
     end do
 
-    ! Arの計算  
-    ! 運動エネルギー計算    
-    do i = 1, nummol(2)
-        vene(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:)*0.500d0*dt
-        sumvene = vene(1)**2 + vene(2)**2 + vene(3)**2
-        typ(2)%mol(i)%kinet = 0.500d0*MASS(2)*sumvene
-    end do
-
-    ! 数値積分 (蛙跳び法)
-    do i = 1, nummol(2)
-        typ(2)%mol(i)%vel(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:)*dt
-        typ(2)%mol(i)%pos(:) = typ(2)%mol(i)%pos(:) + typ(2)%mol(i)%vel(:)*dt
-    end do
-
-    ! Ptの計算
     do j = 1, TYPMOL
-        if(j == 2) then ! Arの場合を除外
+        ! 運動エネルギー計算
+        do i = 1, nummol(j)
+            typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
+            sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
+            typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
+        end do
+    end do
+
+    ! PtのPhantom層はダンパー力とランダム力を付与
+    do j = 1, TYPMOL
+        if(j == 2) then
             cycle
         end if
 
-        ! 運動エネルギー計算
-        do i = 1, nummol(j)
-            vene(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt
-            sumvene = vene(1)**2 + vene(2)**2 + vene(3)**2
-            typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
+        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
+            do k = 1, 3
+                rnd = Random() 
+                ! ランダム力
+                rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
+                ! ダンパー力
+                dmpForce(i,k,j) = -DAMP * typ(j)%mol(i)%vtmp(k) * 1.000d+5 ! 速度の有次元化
+            end do
         end do
 
-        ! 固定層
-        do i = 1, int(nummol(j)/numz(j))
-            typ(j)%mol(i)%vel(:) = 0.0000d0
+        ! ランダム力とダンパー力を追加
+        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
+            typ(j)%mol(i)%acc(:) = typ(j)%mol(i)%acc(:) + (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3 ! -9+26-20 = -3
         end do
+    end do
 
-        ! その他の層
-        do i = int(nummol(j)/numz(j)) + 1, int(nummol(j))
-            typ(j)%mol(i)%vel(:) = typ(j)%mol(i)%vel(:) + dt * typ(j)%mol(i)%acc(:)
-            typ(j)%mol(i)%pos(:) = typ(j)%mol(i)%pos(:) + dt * typ(j)%mol(i)%vel(:)
-        end do
+    do j = 1, TYPMOL
+        ! Arの計算
+        if(j == 2) then
+            ! 数値積分 (蛙跳び法)
+            do i = 1, nummol(2)
+                typ(2)%mol(i)%vel(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:) * dt   ! vel(t+dt/2) = vel(t-dt/2) + acc(t)*dt
+                typ(2)%mol(i)%pos(:) = typ(2)%mol(i)%pos(:) + typ(2)%mol(i)%vel(:) * dt   ! pos(t+dt)   = pos(t)      + vel(t+dt/2)*dt
+            end do
+        else
+        ! Ptの計算
+            ! 固定層
+            do i = 1, int(nummol(j)/numz(j))
+                typ(j)%mol(i)%vel(:) = 0.0000d0
+            end do
+
+            ! その他の層
+            do i = int(nummol(j)/numz(j)) + 1, int(nummol(j))
+                typ(j)%mol(i)%vel(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:) * dt
+                typ(j)%mol(i)%pos(:) = typ(j)%mol(i)%pos(:) + typ(j)%mol(i)%vel(:) * dt
+            end do
+        end if
     end do
 end subroutine calcu
 
@@ -182,35 +174,26 @@ subroutine calc_heatFlux
     use variable
     use molecules_struct
     implicit none
-    integer :: i, j, k
+    integer :: i, j
 
-    heatPhantom(:) = 0.000d0
-    heatSl_Lq = 0.000d0
-
-    do j = 1, TYPMOL
-        if (j == 2) then
-            cycle
-        else
-            do k = 1, 3
-                do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層              ! 速さの有次元化 10^5
-                    heatPhantom(j) = heatPhantom(j) + (rndForce(i,k,j) + dmpForce(i,k,j))*typ(j)%mol(i)%vel(k)*1.000d+5
-                end do
-            end do
-                    heatPhantom(j) = heatPhantom(j) / (areaPt * 1.000d-20) ! 面積の有次元化 10^-20
-        end if
-    end do
+    ! heatPhantom(:) = 0.000d0
+    ! heatInterface = 0.000d0
+    pressure(:) = 0.000d0
 
     do j = 1, TYPMOL
         if (j == 2) then
             cycle
         else
-            do k = 1, 3
-                !do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
-                do i = 1, nummol(2)
-                    heatSl_Lq(j) = heatSl_Lq(j) + interForce(i,k)*1.000d-10*typ(j)%mol(i)%vel(k)*1.000d+5
-                end do
+            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層
+                
+                heatPhantom(j) = heatPhantom(j) + (rndForce(i,3,j) + dmpForce(i,3,j))*typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 速さの有次元化 10^5
             end do
-                    heatSl_Lq(j) = heatSl_Lq(j) / (areaPt * 1.000d-20)
+
+            do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
+
+                heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
+                pressure(j) = pressure(j) + interForce(i,j)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6 ! [MPa]　圧力のオーダーはあってそう
+            end do
         end if
     end do
 

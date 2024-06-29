@@ -130,7 +130,7 @@ module molecules_struct
     !構造体の定義
     type :: mol_info
         double precision :: pos(3)
-        double precision :: vel(3)
+        double precision :: vel(3), vtmp(3)
         double precision :: acc(3)
         double precision :: poten, kinet 
     end type mol_info
@@ -172,35 +172,36 @@ program main
 
         !open(6,*) は使用できない
     ! 各分子の位置データの出力
-        open(10,file='出力ファイル/posit_PtUp.dat')
-        open(11,file='出力ファイル/posit_Ar.dat')
-        open(12,file='出力ファイル/posit_PtLw.dat')
+        open(10,file='/Users/tatsuya/fortran/output/posit_PtUp.dat')
+        open(11,file='/Users/tatsuya/fortran/output/posit_Ar.dat')
+        open(12,file='/Users/tatsuya/fortran/output/posit_PtLw.dat')
     ! 可視化用のpvch.fを移植 
-        open(15,file='出力ファイル/pos.dat')
+        open(15,file='/Users/tatsuya/fortran/exe/pos.dat')
     ! 各分子の速度データの出力
-        open(20,file='出力ファイル/veloc_PtUp.dat')
-        open(21,file='出力ファイル/veloc_Ar.dat')
-        open(22,file='出力ファイル/veloc_PtLw.dat')
+        open(20,file='/Users/tatsuya/fortran/output/veloc_PtUp.dat')
+        open(21,file='/Users/tatsuya/fortran/output/veloc_Ar.dat')
+        open(22,file='/Users/tatsuya/fortran/output/veloc_PtLw.dat')
     ! 系のエネルギーデータの出力
-        open(30,file='出力ファイル/energy_PtUp.dat')
-        open(31,file='出力ファイル/energy_Ar.dat')
-        open(32,file='出力ファイル/energy_PtLw.dat')
-        open(35,file='出力ファイル/energy_all.dat')
+        open(30,file='/Users/tatsuya/fortran/output/energy_PtUp.dat')
+        open(31,file='/Users/tatsuya/fortran/output/energy_Ar.dat')
+        open(32,file='/Users/tatsuya/fortran/output/energy_PtLw.dat')
+        open(35,file='/Users/tatsuya/fortran/output/energy_all.dat')
     ! 系の温度データの出力
-        open(40,file='出力ファイル/tempe.dat')
-        open(41,file='出力ファイル/tempe_PtUp_Layer.dat')
-        open(42,file='出力ファイル/tempe_PtLw_Layer.dat')
+        open(40,file='/Users/tatsuya/fortran/output/tempe.dat')
+        open(41,file='/Users/tatsuya/fortran/output/tempe_PtUp_Layer.dat')
+        open(42,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
     ! 系の周期長さの出力
-        open(50,file='出力ファイル/syuuki.dat')
+        open(50,file='/Users/tatsuya/fortran/output/syuuki.dat')
     ! 熱流束のデータ
-        open(60,file='出力ファイル/heatflux.dat')
+        open(60,file='/Users/tatsuya/fortran/output/heatflux.dat')
+        open(61,file='/Users/tatsuya/fortran/output/pressure.dat')
         
-        open(70,file='出力ファイル/force.dat')
+        open(70,file='/Users/tatsuya/fortran/output/force.dat')
 
     ! 各分子の最終位置データの出力
-        open(80,file='出力ファイル/finpos.dat')
+        open(80,file='/Users/tatsuya/fortran/output/finpos.dat')
     !　分子の色
-        open(90,file='出力ファイル/mask.dat')
+        open(90,file='/Users/tatsuya/fortran/output/mask.dat')
 
     write(15,'(3I7)') moltype, tlnkoss, ndat
     do i = 1,ndat
@@ -518,28 +519,6 @@ program main
         end do
         interForce(:,:) = 0.000d0
 
-        ! PtのPhantom層はダンパー力とランダム力を付与
-        do j = 1, TYPMOL
-            if(j == 2) then
-                cycle
-            end if
-
-            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
-                do k = 1, 3
-                    rnd = Random() 
-                    ! ランダム力
-                    rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
-                    ! ダンパー力
-                    dmpForce(i,k,j) = - DAMP * typ(j)%mol(i)%vel(k) * 1.000d+5 ! 速度の有次元化
-                end do
-            end do
-
-            ! ランダム力とダンパー力を追加
-            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
-                typ(j)%mol(i)%acc(:) = (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3
-            end do
-        end do
-
         ! 分子間の相互作用力 → ポテンシャルエネルギー
         ! 同じ分子同士の影響
         do j = 1, TYPMOL
@@ -636,43 +615,56 @@ program main
             end do
         end do
 
-        ! Arの計算  
-        ! 運動エネルギー計算    
-        do i = 1, nummol(2)
-            vene(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:)*0.500d0*dt
-            sumvene = vene(1)**2 + vene(2)**2 + vene(3)**2
-            typ(2)%mol(i)%kinet = 0.500d0*MASS(2)*sumvene
-        end do
-
-        ! 数値積分 (蛙跳び法)
-        do i = 1, nummol(2)
-            typ(2)%mol(i)%vel(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:)*dt
-            typ(2)%mol(i)%pos(:) = typ(2)%mol(i)%pos(:) + typ(2)%mol(i)%vel(:)*dt
-        end do
-
-        ! Ptの計算
+        ! PtのPhantom層はダンパー力とランダム力を付与
         do j = 1, TYPMOL
-            if(j == 2) then ! Arの場合を除外
+            if(j == 2) then
                 cycle
             end if
 
+            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
+                do k = 1, 3
+                    rnd = Random() 
+                    ! ランダム力
+                    rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
+                    ! ダンパー力
+                    dmpForce(i,k,j) = - DAMP * typ(j)%mol(i)%vtmp(k) * 1.000d+5 ! 速度の有次元化
+                end do
+            end do
+
+            ! ランダム力とダンパー力を追加
+            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
+                typ(j)%mol(i)%acc(:) = typ(j)%mol(i)%acc(:) + (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3 ! +26-20-9 = -3
+            end do
+        end do
+
+        do j = 1, TYPMOL
             ! 運動エネルギー計算
             do i = 1, nummol(j)
-                vene(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt
-                sumvene = vene(1)**2 + vene(2)**2 + vene(3)**2
+                typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt        ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
+                sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
                 typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
             end do
-
-            ! 固定層
-            do i = 1, int(nummol(j)/numz(j))
-                typ(j)%mol(i)%vel(:) = 0.0000d0
-            end do
-
-            ! その他の層
-            do i = int(nummol(j)/numz(j)) + 1, int(nummol(j))
-                typ(j)%mol(i)%vel(:) = typ(j)%mol(i)%vel(:) + dt * typ(j)%mol(i)%acc(:)
-                typ(j)%mol(i)%pos(:) = typ(j)%mol(i)%pos(:) + dt * typ(j)%mol(i)%vel(:)
-            end do
+    
+            ! Arの計算
+            if(j == 2) then
+                ! 数値積分 (蛙跳び法)
+                do i = 1, nummol(2)
+                    typ(2)%mol(i)%vel(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:) * dt   ! vel(t+dt/2) = vel(t-dt/2) + acc(t)*dt
+                    typ(2)%mol(i)%pos(:) = typ(2)%mol(i)%pos(:) + typ(2)%mol(i)%vel(:) * dt   ! pos(t+dt)   = pos(t)      + vel(t+dt/2)*dt
+                end do
+            else
+            ! Ptの計算
+                ! 固定層
+                do i = 1, int(nummol(j)/numz(j))
+                    typ(j)%mol(i)%vel(:) = 0.0000d0
+                end do
+    
+                ! その他の層
+                do i = int(nummol(j)/numz(j)) + 1, int(nummol(j))
+                    typ(j)%mol(i)%vel(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:) * dt
+                    typ(j)%mol(i)%pos(:) = typ(j)%mol(i)%pos(:) + typ(j)%mol(i)%vel(:) * dt
+                end do
+            end if
         end do
     end subroutine calcu
 

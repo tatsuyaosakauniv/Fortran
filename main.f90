@@ -5,7 +5,6 @@ program main
     use forPVwin
     implicit none
     integer :: i, j
-    !character(len=100) :: path = '/Users/tatsuya/fortran/'
 
     ! 配列初期化
     allocate(typ(1)%mol(nummol(1)))
@@ -40,13 +39,15 @@ program main
         open(50,file='/Users/tatsuya/fortran/output/syuuki.dat')
     ! 熱流束のデータ
         open(60,file='/Users/tatsuya/fortran/output/heatflux.dat')
+        open(61,file='/Users/tatsuya/fortran/output/pressure.dat')
         
-        open(70,file='/Users/tatsuya/fortran/output/force.dat')
+        open(70,file='/Users/tatsuya/fortran/output/force_phantom.dat')
+        open(71,file='/Users/tatsuya/fortran/output/force_interface.dat')
 
     ! 各分子の最終位置データの出力
         open(80,file='/Users/tatsuya/fortran/output/finpos.dat')
     !　分子の色
-        open(90,file='/Users/tatsuya/fortran/output/mask.dat')
+        open(90,file='/Users/tatsuya/fortran/exe/mask.dat')
 
     write(15,'(3I7)') moltype, tlnkoss, ndat
     do i = 1,ndat
@@ -57,7 +58,7 @@ program main
             write(90,'(I7)') 14      ! 赤色
         end do
         do j = 1, nummol(2)
-            write(90,'(I7)') 7       ! 黄色
+            write(90,'(I7)') 1       ! 黄色
         end do
         do j = 1, int(nummol(3)/numz(3))
             write(90,'(I7)') 15      ! 白色
@@ -67,7 +68,6 @@ program main
         end do
     end do
     
-    !write(6,*) OMEGA, DAMP
     ! ターミナルに表示
     write(6,*) ''
     write(6, '(A17, F7.4, A2)') 'Scaling Time: ', timeScaling, 'ns'
@@ -75,8 +75,7 @@ program main
     write(6, '(A17, F7.4, A2)') 'Measure Time: ', timeMeasure, 'ns'
     write(6,*) ''
     write(6,'(A16)') '- Scaling Step -'
-    write(6,*) ''
-    
+    write(6,*) '' 
     
     stpNow = 0
 
@@ -91,7 +90,7 @@ program main
             write(6,'(A19)') '- Relaxation Step -'
             write(6,*) ''
         end if
-        if(stpNow == stpScaling+stpRelax) then
+        if(stpNow == stpScaling + stpRelax) then
             write(6,*) ''
             write(6,'(A16)') '- Measure Step -'
             write(6,*) ''
@@ -110,17 +109,15 @@ program main
         call calcu ! 各分子に働く力，速度，位置の分子動力学計算
         call bound ! 境界条件の付与
 
-        if (stpNow >= stpMeasure) then
+        if(stpNow >= stpMeasure .and. mod(stpNow, int(tau/dt)) == 0) then
             call calc_heatFlux
-            if(mod(stpNow, 100) == 1) then
-                call record_heatflux ! 熱流束を記録
-            end if
+            call record_heatflux ! 熱流束を記録
         end if
         
         ! ステップ数が100の倍数+1のとき
         if(mod(stpNow, 100) == 1) then
-          call record_pos_vel ! 位置，速度を記録
-          call record_energy_temp ! エネルギー，温度を記録
+            call record_pos_vel ! 位置，速度を記録
+            call record_energy_temp ! エネルギー，温度を記録
         end if
     end do
 
@@ -139,7 +136,7 @@ program main
         double precision :: v(3)
 
         do i = 1, COMP
-            forCoef(i) = 24.00d0*EPS(i)/SIG(i)
+            forCoef(i) = 24.00d0*EPS(i)/SIG(i)  ! 無次元なことに注意 *1.0d-6
         end do
             forCoef(4) = angCon*24.00d0*EPS(4)/SIG(4)
         

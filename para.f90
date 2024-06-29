@@ -8,7 +8,8 @@ module parameters
     double precision, parameter :: timeSum = timeScaling + timeRelax + timeMeasure ! 全計算時間
     
     double precision, parameter :: dt = 1.00d0 ! 無次元時間ステップ(無次元，有次元の場合fs)
-    double precision, parameter :: tempAr = 175d0 ! 系内（目標）温度  K
+    double precision, parameter :: tau = 20.0d0 ! 測定間隔[fs]
+    double precision, parameter :: tempAr = 150d0 ! 系内（目標）温度  K
     double precision, parameter :: angCon = 0.05d0 ! 接触角
 
     ! ステップ
@@ -20,16 +21,16 @@ module parameters
     ! 分子の数，配置
     integer, parameter :: TYPMOL = 3 ! 分子の種類数
     integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = TYPMOLC2
-    integer, parameter :: numx(TYPMOL) = [10, 6, 10]
-    integer, parameter :: numy(TYPMOL) = [ 5, 3,  5]
-    integer, parameter :: numz(TYPMOL) = [ 4, 15, 4]
+    integer, parameter :: numx(TYPMOL) = [12, 8, 12]
+    integer, parameter :: numy(TYPMOL) = [ 6, 4,  6]
+    integer, parameter :: numz(TYPMOL) = [ 4, 18, 4]
     integer, parameter :: nummol(TYPMOL) = [numx(1)*numy(1)*numz(1), numx(2)*numy(2)*numz(2), numx(3)*numy(3)*numz(3)] ! 各分子の数
     
     ! 境界条件
-    double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 6.0d0, 3.92d0] ! 格子定数(無次元)[Å]
+    double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 5.7d0, 3.92d0] ! 格子定数(無次元)[Å]
     double precision, parameter :: xsyul0 = STDIST(1) * numy(1) ! x方向の周期境界長さ(無次元)
     double precision, parameter :: ysyul0 = STDIST(1) * numy(1) ! y方向の周期境界長さ(無次元）
-    double precision, parameter :: zsyul0 = (STDIST(1)*numz(1)+STDIST(2)*numz(2)+STDIST(3)*numz(3))*0.5d0 ! z方向の周期境界長さ(無次元）
+    double precision, parameter :: zsyul0 = (STDIST(1)*numz(1)+STDIST(2)*numz(2)+STDIST(3)*numz(3))*0.5d0! z方向の周期境界長さ(無次元）
     double precision, parameter :: syul0(3) = [xsyul0, ysyul0, zsyul0]
     
     double precision, parameter :: CUTOFF = 3.300d0 ! カットオフ長さ/σ
@@ -41,11 +42,11 @@ module parameters
     !double precision, parameter :: bunsi(TYPMOL) = [195.084d-3, 39.950d-3, 195.084d-3] ! 分子の質量  kg/mol   
     double precision, parameter :: MASS(TYPMOL) = [32.395d0, 6.6340d0, 32.395d0] ! 分子の質量（無次元） * 10d-26 [kg/個]
     ! Lennard-Jonesパラメータ
-    double precision, parameter :: SIG(COMP+1) = [2.475d0, 3.4000d0, 2.4750d0, 2.9375d0]  ! σ(無次元)
-    double precision, parameter :: EPS(COMP+1) = [83.31d-5, 1.666d-5, 83.31d-5, 11.78d-5] ! ε(無次元)
+    double precision, parameter :: SIG(COMP+1) = [2.540d0, 3.400d0, 2.540d0, 2.970d0]  ! σ(無次元) *1.0d-10
+    double precision, parameter :: EPS(COMP+1) = [109.2d-5, 1.666d-5, 109.2d-5, 13.49d-5] ! ε(無次元) *1.0d-16
 
     ! Langevin法
-    double precision, parameter :: tempLanPt(TYPMOL) = [200d0, 0d0, 150d0] ! Langevin法を用いるPtの温度  真ん中は使わない
+    double precision, parameter :: tempLanPt(TYPMOL) = [200d0, 0d0, 100d0] ! Langevin法を用いるPtの温度  真ん中は使わない
     double precision, parameter :: DIRAC = 1.054571817d-34 ! ディラック定数 [J･s]
     double precision, parameter :: DEBTMP = 240d0 ! Debye温度 [K]
     double precision, parameter :: OMEGA = 3.14212728482d+13 ! BOLTZ * DEBTMP / DIRAC * 1.000d-11 ! Debye定数 (有次元)
@@ -77,12 +78,13 @@ module variable
     logical :: isOdd = .true. ! 乱数のsinとcosを交互に出すためのフラグ
 
     ! 熱流束
-    double precision :: interForce(nummol(2), 3) ! 熱流束を計算するための相互作用力
-    double precision :: heatPhantom(TYPMOL) ! Phantom層からの熱輸送量
-    double precision :: heatSl_Lq(TYPMOL) ! 固液界面での熱輸送量
+    double precision :: integrationTime ! 積算時間[fs]
+    double precision :: interForce(nummol(2), TYPMOL) ! 熱流束を計算するための相互作用力 z方向のみを使う
+    double precision :: heatPhantom(TYPMOL) = 0.000d0 ! Phantom層からの熱輸送量
+    double precision :: heatInterface(TYPMOL) = 0.000d0 ! 固液界面での熱輸送量
     double precision :: fluxPt ! 熱流束
     double precision :: tempLayer(numz(1),TYPMOL) ! Arは使わない
-    ! double precision :: tempLayerLw(numz(3))
+    double precision :: pressure(TYPMOL)
 
     contains
 
@@ -111,7 +113,7 @@ module variable
         double precision, intent(in) :: T_
         double precision :: stddev_
 
-        stddev_ = dsqrt(2.000d0 * BOLTZ * T_ * DAMP / dt * 1.000d+33)  ! 無次元 stddev -> 10^9
+        stddev_ = dsqrt(2.000d0 * BOLTZ * T_ * DAMP / dt * 1.000d+33)  ! 無次元 stddev -> 有次元では10^9
 
     end function getStddev
 end module variable
@@ -123,7 +125,7 @@ module molecules_struct
     !構造体の定義
     type :: mol_info
         double precision :: pos(3)
-        double precision :: vel(3)
+        double precision :: vel(3), vtmp(3)
         double precision :: acc(3)
         double precision :: poten, kinet 
     end type mol_info

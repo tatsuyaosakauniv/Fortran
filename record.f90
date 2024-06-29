@@ -24,8 +24,12 @@ subroutine record_pos_vel ! 位置，速度を記録
         write(22, '(I6, 3E15.7)') i, typ(3)%mol(i)%vel(1), typ(3)%mol(i)%vel(2), typ(3)%mol(i)%vel(3)
     end do
 
-    do i = int(nummol(1)/numz(1)) + 1, int(nummol(1) *2/numz(1))
-        write(70, '(9E15.7)') rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1), interForce(i,1), interForce(i,2), interForce(i,3)
+    do i = int(nummol(1)/numz(1)) + 1, 2*int(nummol(1)/numz(1))
+        write(70, '(I6, 6E15.7)') i, rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1)
+    end do
+
+    do i = (numz(1)-1)*int(nummol(1)/numz(1)) + 1, nummol(1) ! 固液界面層
+        write(71, '(I6, 3E15.7)') i, interForce(i,1), interForce(i,2), interForce(i,3) ! 上Pt, Ar, 下Pt
     end do
 
     ! 可視化用
@@ -113,7 +117,8 @@ subroutine record_heatflux ! 熱流束を記録
     use molecules_struct
     implicit none
 
-    write(60,'(I6, 4E15.7)') (stpNow+99)*int(dt), heatPhantom(1), heatPhantom(3), heatSl_Lq(1), heatSl_Lq(3)
+    write(60,'(I6, 6E15.7)') (stpNow-stpScaling-stpRelax)*int(dt), heatPhantom(1), heatPhantom(3), heatInterface(1), heatInterface(3)
+    write(61,'(I6, 3E15.7)') (stpNow-stpScaling-stpRelax)*int(dt), pressure(1), pressure(2), pressure(3)
 end subroutine record_heatflux
 
 subroutine record_finpos_vel ! 最終状態の分子の位置と速度を記録
