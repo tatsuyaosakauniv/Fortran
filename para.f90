@@ -2,9 +2,9 @@ module parameters
     implicit none
 !--------------- よく変更する---------------------!
     ! 計算時間
-    double precision, parameter :: timeScaling = 0.005d0 ! スケーリング時間[ns]
+    double precision, parameter :: timeScaling = 0.0025d0 ! スケーリング時間[ns]
     double precision, parameter :: timeRelax   = 0.005d0 ! 緩和計算時間[ns]
-    double precision, parameter :: timeMeasure = 0.010d0 ! データ計測時間[ns]
+    double precision, parameter :: timeMeasure = 0.0225d0 ! データ計測時間[ns]
     double precision, parameter :: timeSum = timeScaling + timeRelax + timeMeasure ! 全計算時間
     
     double precision, parameter :: dt = 1.00d0 ! 無次元時間ステップ(無次元，有次元の場合fs)
@@ -14,13 +14,13 @@ module parameters
 
     ! ステップ
     integer, parameter :: stpScaling = int(timeScaling/dt*1.0d+6) ! スケーリングステップ
-    integer, parameter :: stpRelax   = int(timeRelax  /dt*1.0d+6) ! 緩和計算ステップ
-    integer, parameter :: stpMeasure = int(timeMeasure/dt*1.0d+6) ! データ計測ステップ
-    integer, parameter :: stpMax = int(timeSum/dt*1.0d+6) ! 最大ステップ数
+    integer, parameter :: stpRelax   = int(timeRelax  /dt*1.0d+6)+stpScaling ! 緩和計算ステップ
+    integer, parameter :: stpMax = int(timeMeasure/dt*1.0d+6)+stpRelax ! データ計測ステップ
+    ! integer, parameter :: stpMax = int(timeSum/dt*1.0d+6) ! 最大ステップ数
 
     ! 分子の数，配置
     integer, parameter :: TYPMOL = 3 ! 分子の種類数
-    integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = TYPMOLC2
+    integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = nC2
     integer, parameter :: numx(TYPMOL) = [12, 8, 12]
     integer, parameter :: numy(TYPMOL) = [ 6, 4,  6]
     integer, parameter :: numz(TYPMOL) = [ 4, 18, 4]
@@ -28,9 +28,10 @@ module parameters
     
     ! 境界条件
     double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 5.7d0, 3.92d0] ! 格子定数(無次元)[Å]
+    double precision, parameter :: thick(TYPMOL) = [STDIST(1)*(numz(1)*0.5d0+0.25d0), STDIST(2)*numz(2)*0.5d0, STDIST(3)*(numz(3)*0.5d0+0.25d0)]
     double precision, parameter :: xsyul0 = STDIST(1) * numy(1) ! x方向の周期境界長さ(無次元)
     double precision, parameter :: ysyul0 = STDIST(1) * numy(1) ! y方向の周期境界長さ(無次元）
-    double precision, parameter :: zsyul0 = (STDIST(1)*numz(1)+STDIST(2)*numz(2)+STDIST(3)*numz(3))*0.5d0! z方向の周期境界長さ(無次元）
+    double precision, parameter :: zsyul0 = thick(1)+thick(2)+thick(3) ! z方向の周期境界長さ(無次元）
     double precision, parameter :: syul0(3) = [xsyul0, ysyul0, zsyul0]
     
     double precision, parameter :: CUTOFF = 3.300d0 ! カットオフ長さ/σ
@@ -53,7 +54,8 @@ module parameters
     double precision, parameter :: DAMP =  5.32967075080d-12 ! MASS(1) * PI * OMEGA / 6.000d0 ! ダンパーの減衰係数 (有次元)
     ! 熱流束
     double precision, parameter :: areaPt = STDIST(1)*STDIST(1)*int(numx(1)*0.5)*numy(1)
-    !double precision, 
+    
+    integer, parameter :: numDivAr = 15 ! Arの温度分布の分割数
 
 end module parameters
 
@@ -83,8 +85,11 @@ module variable
     double precision :: heatPhantom(TYPMOL) = 0.000d0 ! Phantom層からの熱輸送量
     double precision :: heatInterface(TYPMOL) = 0.000d0 ! 固液界面での熱輸送量
     double precision :: fluxPt ! 熱流束
-    double precision :: tempLayer(numz(1),TYPMOL) ! Arは使わない
-    double precision :: pressure(TYPMOL)
+    double precision :: pressure(TYPMOL) ! 圧力
+
+    double precision :: tempLayerPt(numz(1),TYPMOL) = 0.000d0 ! Ptの層ごとの温度
+    double precision :: tempLayerAr(numDivAr) = 0.000d0 ! z方向に分割した領域内のArの温度
+    double precision :: zdiv = thick(2)/numDivAr ! Arの温度分布の分割距離
 
     contains
 
@@ -113,7 +118,7 @@ module variable
         double precision, intent(in) :: T_
         double precision :: stddev_
 
-        stddev_ = dsqrt(2.000d0 * BOLTZ * T_ * DAMP / dt * 1.000d+33)  ! 無次元 stddev -> 有次元では10^9
+        stddev_ = dsqrt(2.000d0 * DAMP * BOLTZ * T_ / dt * 1.000d+33)  ! 無次元 stddev -> 有次元では10^9
 
     end function getStddev
 end module variable

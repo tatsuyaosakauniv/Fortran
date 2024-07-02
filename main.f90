@@ -1,6 +1,6 @@
 program main
     use parameters
-    use variable, only: stpNow
+    use variable, !only: stpNow
     use molecules_struct
     use forPVwin
     implicit none
@@ -34,7 +34,10 @@ program main
     ! 系の温度データの出力
         open(40,file='/Users/tatsuya/fortran/output/tempe.dat')
         open(41,file='/Users/tatsuya/fortran/output/tempe_PtUp_Layer.dat')
-        open(42,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
+        open(42,file='/Users/tatsuya/fortran/output/tempe_Ar_Layer.dat')
+        open(43,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
+        
+        open(45,file='/Users/tatsuya/fortran/output/tempe_Layer.dat')
     ! 系の周期長さの出力
         open(50,file='/Users/tatsuya/fortran/output/syuuki.dat')
     ! 熱流束のデータ
@@ -77,6 +80,10 @@ program main
     write(6,'(A16)') '- Scaling Step -'
     write(6,*) '' 
     
+    write(6,*) stpScaling, stpRelax, stpMax
+    write(6,*) xsyul0, ysyul0, zsyul0
+    write(6,*) zdiv
+
     stpNow = 0
 
     call seting ! 各分子の初期位置，初期速度などの設定
@@ -90,7 +97,7 @@ program main
             write(6,'(A19)') '- Relaxation Step -'
             write(6,*) ''
         end if
-        if(stpNow == stpScaling + stpRelax) then
+        if(stpNow == stpRelax) then
             write(6,*) ''
             write(6,'(A16)') '- Measure Step -'
             write(6,*) ''
@@ -103,25 +110,24 @@ program main
 
         ! スケーリング
         if (stpNow <= stpScaling .and. mod(stpNow,100) == 0) then
-        	call scaling ! 系内の全分子の温度の補正
+            call scaling ! 系内の全分子の温度の補正
         endif
 
         call calcu ! 各分子に働く力，速度，位置の分子動力学計算
         call bound ! 境界条件の付与
 
-        if(stpNow >= stpMeasure .and. mod(stpNow, int(tau/dt)) == 0) then
-            call calc_heatFlux
-            call record_heatflux ! 熱流束を記録
+        if(stpNow >= stpRelax .and. mod(stpNow, int(tau/dt)) == 0) then
+            call record_energy_temp ! エネルギー，温度を記録
+            call record_pressure_heatflux ! 熱流束を記録
         end if
         
         ! ステップ数が100の倍数+1のとき
         if(mod(stpNow, 100) == 1) then
             call record_pos_vel ! 位置，速度を記録
-            call record_energy_temp ! エネルギー，温度を記録
         end if
     end do
 
-    call record_finpos_vel ! 最終状態の分子の位置と速度を記録
+    call record_final ! 最終状態を記録
 
     contains
     subroutine seting ! 各分子の初期位置，初期速度などの設定
@@ -242,10 +248,8 @@ program main
         cr = 1.00d-6
         do j = 1, TYPMOL
             do i = 1, nummol(j)
-                !read(1,*)ran
                 call random_number(ran)
                 alpha = PI*ran
-                !read(2,*)ran
                 call random_number(ran)
                 beta = 2.000d0*PI*ran
                 v(1) = dsin(alpha)*dcos(beta)*cr
@@ -256,12 +260,12 @@ program main
         end do
 
         do j = 1, TYPMOL
-            do i = 1, int(nummol(j)/numz(j))
-                if(j == 2) then
-                    cycle
-                else
-                    typ(j)%mol(i)%vel(:) = 0.000d0
-                end if
+            if(j == 2) then
+                cycle
+            end if
+
+            do i = 1, int(nummol(j)/numz(j))        
+                typ(j)%mol(i)%vel(:) = 0.000d0
             end do
         end do
     end subroutine seting

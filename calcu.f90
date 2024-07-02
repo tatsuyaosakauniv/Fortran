@@ -168,33 +168,3 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
         end if
     end do
 end subroutine calcu
-
-subroutine calc_heatFlux
-    use parameters
-    use variable
-    use molecules_struct
-    implicit none
-    integer :: i, j
-
-    ! heatPhantom(:) = 0.000d0
-    ! heatInterface = 0.000d0
-    pressure(:) = 0.000d0
-
-    do j = 1, TYPMOL
-        if (j == 2) then
-            cycle
-        else
-            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層
-                
-                heatPhantom(j) = heatPhantom(j) + (rndForce(i,3,j) + dmpForce(i,3,j))*typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 速さの有次元化 10^5
-            end do
-
-            do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
-
-                heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
-                pressure(j) = pressure(j) + interForce(i,j)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6 ! [MPa]　圧力のオーダーはあってそう
-            end do
-        end if
-    end do
-
-end subroutine calc_heatFlux

@@ -1,42 +1,37 @@
-!-----------------------------------------------------------------------
-! example.f90
-! ナノ粒子の初期状態を分子動力学法で作成する．
-! 必要ファイル: random0.dat, random1.dat
-!-----------------------------------------------------------------------
-
-! パラメータ（もともとparate.datにあったもの）
 module parameters
     implicit none
 !--------------- よく変更する---------------------!
     ! 計算時間
-    double precision, parameter :: timeScaling = 0.005d0 ! スケーリング時間[ns]
+    double precision, parameter :: timeScaling = 0.0025d0 ! スケーリング時間[ns]
     double precision, parameter :: timeRelax   = 0.005d0 ! 緩和計算時間[ns]
-    double precision, parameter :: timeMeasure = 0.010d0 ! データ計測時間[ns]
+    double precision, parameter :: timeMeasure = 0.0225d0 ! データ計測時間[ns]
     double precision, parameter :: timeSum = timeScaling + timeRelax + timeMeasure ! 全計算時間
     
     double precision, parameter :: dt = 1.00d0 ! 無次元時間ステップ(無次元，有次元の場合fs)
-    double precision, parameter :: tempAr = 175d0 ! 系内（目標）温度  K
+    double precision, parameter :: tau = 20.0d0 ! 測定間隔[fs]
+    double precision, parameter :: tempAr = 150d0 ! 系内（目標）温度  K
     double precision, parameter :: angCon = 0.05d0 ! 接触角
 
     ! ステップ
     integer, parameter :: stpScaling = int(timeScaling/dt*1.0d+6) ! スケーリングステップ
-    integer, parameter :: stpRelax   = int(timeRelax  /dt*1.0d+6) ! 緩和計算ステップ
-    integer, parameter :: stpMeasure = int(timeMeasure/dt*1.0d+6) ! データ計測ステップ
-    integer, parameter :: stpMax = int(timeSum/dt*1.0d+6) ! 最大ステップ数
+    integer, parameter :: stpRelax   = int(timeRelax  /dt*1.0d+6)+stpScaling ! 緩和計算ステップ
+    integer, parameter :: stpMax = int(timeMeasure/dt*1.0d+6)+stpRelax ! データ計測ステップ
+    ! integer, parameter :: stpMax = int(timeSum/dt*1.0d+6) ! 最大ステップ数
 
     ! 分子の数，配置
     integer, parameter :: TYPMOL = 3 ! 分子の種類数
-    integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = TYPMOLC2
-    integer, parameter :: numx(TYPMOL) = [10, 6, 10]
-    integer, parameter :: numy(TYPMOL) = [ 5, 3,  5]
-    integer, parameter :: numz(TYPMOL) = [ 4, 15, 4]
+    integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = nC2
+    integer, parameter :: numx(TYPMOL) = [12, 8, 12]
+    integer, parameter :: numy(TYPMOL) = [ 6, 4,  6]
+    integer, parameter :: numz(TYPMOL) = [ 4, 18, 4]
     integer, parameter :: nummol(TYPMOL) = [numx(1)*numy(1)*numz(1), numx(2)*numy(2)*numz(2), numx(3)*numy(3)*numz(3)] ! 各分子の数
     
     ! 境界条件
-    double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 6.0d0, 3.92d0] ! 格子定数(無次元)[Å]
+    double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 5.7d0, 3.92d0] ! 格子定数(無次元)[Å]
+    double precision, parameter :: thick(TYPMOL) = [STDIST(1)*(numz(1)*0.5d0+0.25d0), STDIST(2)*numz(2)*0.5d0, STDIST(3)*(numz(3)*0.5d0+0.25d0)]
     double precision, parameter :: xsyul0 = STDIST(1) * numy(1) ! x方向の周期境界長さ(無次元)
     double precision, parameter :: ysyul0 = STDIST(1) * numy(1) ! y方向の周期境界長さ(無次元）
-    double precision, parameter :: zsyul0 = (STDIST(1)*numz(1)+STDIST(2)*numz(2)+STDIST(3)*numz(3))*0.5d0 ! z方向の周期境界長さ(無次元）
+    double precision, parameter :: zsyul0 = thick(1)+thick(2)+thick(3) ! z方向の周期境界長さ(無次元）
     double precision, parameter :: syul0(3) = [xsyul0, ysyul0, zsyul0]
     
     double precision, parameter :: CUTOFF = 3.300d0 ! カットオフ長さ/σ
@@ -48,18 +43,19 @@ module parameters
     !double precision, parameter :: bunsi(TYPMOL) = [195.084d-3, 39.950d-3, 195.084d-3] ! 分子の質量  kg/mol   
     double precision, parameter :: MASS(TYPMOL) = [32.395d0, 6.6340d0, 32.395d0] ! 分子の質量（無次元） * 10d-26 [kg/個]
     ! Lennard-Jonesパラメータ
-    double precision, parameter :: SIG(COMP+1) = [2.475d0, 3.4000d0, 2.4750d0, 2.9375d0]  ! σ(無次元)
-    double precision, parameter :: EPS(COMP+1) = [83.31d-5, 1.666d-5, 83.31d-5, 11.78d-5] ! ε(無次元)
+    double precision, parameter :: SIG(COMP+1) = [2.540d0, 3.400d0, 2.540d0, 2.970d0]  ! σ(無次元) *1.0d-10
+    double precision, parameter :: EPS(COMP+1) = [109.2d-5, 1.666d-5, 109.2d-5, 13.49d-5] ! ε(無次元) *1.0d-16
 
     ! Langevin法
-    double precision, parameter :: tempLanPt(TYPMOL) = [200d0, 0d0, 150d0] ! Langevin法を用いるPtの温度  真ん中は使わない
+    double precision, parameter :: tempLanPt(TYPMOL) = [200d0, 0d0, 100d0] ! Langevin法を用いるPtの温度  真ん中は使わない
     double precision, parameter :: DIRAC = 1.054571817d-34 ! ディラック定数 [J･s]
     double precision, parameter :: DEBTMP = 240d0 ! Debye温度 [K]
     double precision, parameter :: OMEGA = 3.14212728482d+13 ! BOLTZ * DEBTMP / DIRAC * 1.000d-11 ! Debye定数 (有次元)
     double precision, parameter :: DAMP =  5.32967075080d-12 ! MASS(1) * PI * OMEGA / 6.000d0 ! ダンパーの減衰係数 (有次元)
     ! 熱流束
     double precision, parameter :: areaPt = STDIST(1)*STDIST(1)*int(numx(1)*0.5)*numy(1)
-    !double precision, 
+    
+    integer, parameter :: numDivAr = 15 ! Arの温度分布の分割数
 
 end module parameters
 
@@ -84,12 +80,16 @@ module variable
     logical :: isOdd = .true. ! 乱数のsinとcosを交互に出すためのフラグ
 
     ! 熱流束
-    double precision :: interForce(nummol(2), 3) ! 熱流束を計算するための相互作用力
-    double precision :: heatPhantom(TYPMOL) ! Phantom層からの熱輸送量
-    double precision :: heatSl_Lq(TYPMOL) ! 固液界面での熱輸送量
+    double precision :: integrationTime ! 積算時間[fs]
+    double precision :: interForce(nummol(2), TYPMOL) ! 熱流束を計算するための相互作用力 z方向のみを使う
+    double precision :: heatPhantom(TYPMOL) = 0.000d0 ! Phantom層からの熱輸送量
+    double precision :: heatInterface(TYPMOL) = 0.000d0 ! 固液界面での熱輸送量
     double precision :: fluxPt ! 熱流束
-    double precision :: tempLayer(numz(1),TYPMOL) ! Arは使わない
-    ! double precision :: tempLayerLw(numz(3))
+    double precision :: pressure(TYPMOL) ! 圧力
+
+    double precision :: tempLayerPt(numz(1),TYPMOL) = 0.000d0 ! Ptの層ごとの温度
+    double precision :: tempLayerAr(numDivAr) = 0.000d0 ! z方向に分割した領域内のArの温度
+    double precision :: zdiv = thick(2)/numDivAr ! Arの温度分布の分割距離
 
     contains
 
@@ -118,7 +118,7 @@ module variable
         double precision, intent(in) :: T_
         double precision :: stddev_
 
-        stddev_ = dsqrt(2.000d0 * BOLTZ * T_ * DAMP / dt * 1.000d+33)  ! 無次元 stddev -> 10^9
+        stddev_ = dsqrt(2.000d0 * DAMP * BOLTZ * T_ / dt * 1.000d+33)  ! 無次元 stddev -> 有次元では10^9
 
     end function getStddev
 end module variable
@@ -155,7 +155,7 @@ end module forPVwin
 
 program main
     use parameters
-    use variable, only: stpNow
+    use variable, !only: stpNow
     use molecules_struct
     use forPVwin
     implicit none
@@ -189,19 +189,23 @@ program main
     ! 系の温度データの出力
         open(40,file='/Users/tatsuya/fortran/output/tempe.dat')
         open(41,file='/Users/tatsuya/fortran/output/tempe_PtUp_Layer.dat')
-        open(42,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
+        open(42,file='/Users/tatsuya/fortran/output/tempe_Ar_Layer.dat')
+        open(43,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
+        
+        open(45,file='/Users/tatsuya/fortran/output/tempe_Layer.dat')
     ! 系の周期長さの出力
         open(50,file='/Users/tatsuya/fortran/output/syuuki.dat')
     ! 熱流束のデータ
         open(60,file='/Users/tatsuya/fortran/output/heatflux.dat')
         open(61,file='/Users/tatsuya/fortran/output/pressure.dat')
         
-        open(70,file='/Users/tatsuya/fortran/output/force.dat')
+        open(70,file='/Users/tatsuya/fortran/output/force_phantom.dat')
+        open(71,file='/Users/tatsuya/fortran/output/force_interface.dat')
 
     ! 各分子の最終位置データの出力
         open(80,file='/Users/tatsuya/fortran/output/finpos.dat')
     !　分子の色
-        open(90,file='/Users/tatsuya/fortran/output/mask.dat')
+        open(90,file='/Users/tatsuya/fortran/exe/mask.dat')
 
     write(15,'(3I7)') moltype, tlnkoss, ndat
     do i = 1,ndat
@@ -212,7 +216,7 @@ program main
             write(90,'(I7)') 14      ! 赤色
         end do
         do j = 1, nummol(2)
-            write(90,'(I7)') 7       ! 黄色
+            write(90,'(I7)') 1       ! 黄色
         end do
         do j = 1, int(nummol(3)/numz(3))
             write(90,'(I7)') 15      ! 白色
@@ -222,7 +226,6 @@ program main
         end do
     end do
     
-    !write(6,*) OMEGA, DAMP
     ! ターミナルに表示
     write(6,*) ''
     write(6, '(A17, F7.4, A2)') 'Scaling Time: ', timeScaling, 'ns'
@@ -230,9 +233,12 @@ program main
     write(6, '(A17, F7.4, A2)') 'Measure Time: ', timeMeasure, 'ns'
     write(6,*) ''
     write(6,'(A16)') '- Scaling Step -'
-    write(6,*) ''
+    write(6,*) '' 
     
-    
+    write(6,*) stpScaling, stpRelax, stpMax
+    write(6,*) xsyul0, ysyul0, zsyul0
+    write(6,*) zdiv
+
     stpNow = 0
 
     call seting ! 各分子の初期位置，初期速度などの設定
@@ -246,7 +252,7 @@ program main
             write(6,'(A19)') '- Relaxation Step -'
             write(6,*) ''
         end if
-        if(stpNow == stpScaling+stpRelax) then
+        if(stpNow == stpRelax) then
             write(6,*) ''
             write(6,'(A16)') '- Measure Step -'
             write(6,*) ''
@@ -259,27 +265,24 @@ program main
 
         ! スケーリング
         if (stpNow <= stpScaling .and. mod(stpNow,100) == 0) then
-        	call scaling ! 系内の全分子の温度の補正
+            call scaling ! 系内の全分子の温度の補正
         endif
 
         call calcu ! 各分子に働く力，速度，位置の分子動力学計算
         call bound ! 境界条件の付与
 
-        if (stpNow >= stpMeasure) then
-            call calc_heatFlux
-            if(mod(stpNow, 100) == 1) then
-                call record_heatflux ! 熱流束を記録
-            end if
+        if(stpNow >= stpRelax .and. mod(stpNow, int(tau/dt)) == 0) then
+            call record_energy_temp ! エネルギー，温度を記録
+            call record_pressure_heatflux ! 熱流束を記録
         end if
         
         ! ステップ数が100の倍数+1のとき
         if(mod(stpNow, 100) == 1) then
-          call record_pos_vel ! 位置，速度を記録
-          call record_energy_temp ! エネルギー，温度を記録
+            call record_pos_vel ! 位置，速度を記録
         end if
     end do
 
-    call record_finpos_vel ! 最終状態の分子の位置と速度を記録
+    call record_final ! 最終状態を記録
 
     contains
     subroutine seting ! 各分子の初期位置，初期速度などの設定
@@ -294,7 +297,7 @@ program main
         double precision :: v(3)
 
         do i = 1, COMP
-            forCoef(i) = 24.00d0*EPS(i)/SIG(i)
+            forCoef(i) = 24.00d0*EPS(i)/SIG(i)  ! 無次元なことに注意 *1.0d-6
         end do
             forCoef(4) = angCon*24.00d0*EPS(4)/SIG(4)
         
@@ -400,10 +403,8 @@ program main
         cr = 1.00d-6
         do j = 1, TYPMOL
             do i = 1, nummol(j)
-                !read(1,*)ran
                 call random_number(ran)
                 alpha = PI*ran
-                !read(2,*)ran
                 call random_number(ran)
                 beta = 2.000d0*PI*ran
                 v(1) = dsin(alpha)*dcos(beta)*cr
@@ -414,63 +415,15 @@ program main
         end do
 
         do j = 1, TYPMOL
-            do i = 1, int(nummol(j)/numz(j))
-                if(j == 2) then
-                    cycle
-                else
-                    typ(j)%mol(i)%vel(:) = 0.000d0
-                end if
+            if(j == 2) then
+                cycle
+            end if
+
+            do i = 1, int(nummol(j)/numz(j))        
+                typ(j)%mol(i)%vel(:) = 0.000d0
             end do
         end do
     end subroutine seting
-
-    subroutine cortra ! 系内の全分子の並進速度の補正
-        use parameters
-        use variable
-        implicit none
-        double precision :: trv(3)
-        integer :: i, j
-
-        ! 速度ベクトルの成分の平均を計算
-        do j = 1, TYPMOL
-            trv(:) = 0.0d0
-            do i = 1, nummol(j)
-                trv(:) = trv(:) + typ(j)%mol(i)%vel(:)
-            end do
-
-            trv(:) = trv(:) / nummol(j)
-
-            ! 速度ベクトルから平均を引いて中心補正
-            do i = 1, nummol(j)
-                typ(j)%mol(i)%vel(:) = typ(j)%mol(i)%vel(:) - trv(:)
-            end do
-        end do
-    end subroutine cortra
-
-    subroutine jyusin ! 系内の全分子の重心の補正
-        use parameters
-        use variable
-        use molecules_struct
-        implicit none
-        double precision :: cms(3)
-        double precision :: tcms(3)
-        integer :: i, j
-
-        cms(:) = syul0(:) * 0.500d0
-
-        do j = 1, TYPMOL
-            tcms(:) = 0.0000d0
-            do i = 1, nummol(j)
-                tcms(:) = tcms(:) + typ(j)%mol(i)%pos(:)
-            end do
-
-            tcms(:) = cms(:) - tcms(:)/dble(nummol(j))
-
-            do i = 1, nummol(j)
-                typ(j)%mol(i)%pos(:) = typ(j)%mol(i)%pos(:) + tcms(:)
-            end do
-        end do
-    end subroutine jyusin
 
     subroutine scaling ! 系内の全分子の温度の補正
         use parameters
@@ -509,7 +462,7 @@ program main
         double precision :: ppp, force, forVec(3)
         double precision :: vene(3), sumvene
         double precision :: rnd
-
+    
         do j = 1, TYPMOL
             do i = 1, nummol(j)
                 typ(j)%mol(i)%acc(:) = 0.0000d0
@@ -518,7 +471,7 @@ program main
             end do
         end do
         interForce(:,:) = 0.000d0
-
+    
         ! 分子間の相互作用力 → ポテンシャルエネルギー
         ! 同じ分子同士の影響
         do j = 1, TYPMOL
@@ -535,12 +488,12 @@ program main
                         endif
         
                         div(k) = div(k) / SIG(j)
-
+    
                         if (abs(div(k)) > CUTOFF) then
                             cycle
                         endif
                     end do
-
+    
                     dit2 = div(1)**2 + div(2)**2 + div(3)**2
                     dist = dsqrt(dit2)
     
@@ -556,7 +509,7 @@ program main
                     ppp    = 4.00d0*EPS(j)*(1.00d0/dit12-1.00d0/dit6)
                     typ(j)%mol(i1)%poten = typ(j)%mol(i1)%poten + ppp*0.500d0
                     typ(j)%mol(i2)%poten = typ(j)%mol(i2)%poten + ppp*0.500d0
-
+    
                     force  = forCoef(j)*(-2.00d0/dit14+1.00d0/dit8)
                     forVec(:) = -force*div(:)
                     typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
@@ -564,7 +517,7 @@ program main
                 end do
             end do
         end do
-
+    
         ! 異なる分子同士の影響  ! Ar-Ptの処理    配列は1が上Pt, 2がAr, 3がしたPt
         do j = 1, TYPMOL
             if(j == 2) then
@@ -573,7 +526,7 @@ program main
             do i1 = 1, nummol(j)       ! Pt
                 do i2 = 1, nummol(2)    ! Ar
                     div(:) = typ(j)%mol(i1)%pos(:) - typ(2)%mol(i2)%pos(:)
-
+    
                     do k = 1, 3
                         if (div(k) < -cutof(k)) then
                             div(k) = div(k) + syul(k)
@@ -581,20 +534,20 @@ program main
                             div(k) = div(k) - syul(k)
                         endif
         
-                        div(k) = div(k) / SIG(j)
-
+                        div(k) = div(k) / SIG(4)
+    
                         if (abs(div(k)) > CUTOFF) then
                             cycle
                         endif
                     end do
-
+    
                     dit2 = div(1)**2 + div(2)**2 + div(3)**2
                     dist = dsqrt(dit2)
-
+    
                     if(dist > CUTOFF) then
                         cycle
                     endif
-
+    
                     dit4   = dit2*dit2
                     dit6   = dit4*dit2
                     dit8   = dit4*dit4
@@ -603,48 +556,49 @@ program main
                     ppp    = angCon*4.00d0*EPS(4)*(1.00d0/dit12-1.00d0/dit6) ! 異分子間ではangCon(接触角)を忘れずに
                     typ(j)%mol(i1)%poten = typ(j)%mol(i1)%poten + ppp*0.500d0
                     typ(2)%mol(i2)%poten = typ(2)%mol(i2)%poten + ppp*0.500d0
-
+    
                     force  = forCoef(4)*(-2.00d0/dit14+1.00d0/dit8)
-                    do k = 1, 3
-                        forVec(k) = -force*div(k)
-                        interForce(i1,k) = interForce(i1,k) + forVec(k) ! 無次元なことに注意
-                    end do
+                    forVec(:) = -force*div(:)
+                    interForce(i1,j) = interForce(i1,j) - forVec(3) ! 無次元なことに注意　符号が逆な気がする
+    
                     typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
                     typ(2)%mol(i2)%acc(:) = typ(2)%mol(i2)%acc(:) - forVec(:)/MASS(2)
                 end do
             end do
         end do
-
+    
+        do j = 1, TYPMOL
+            ! 運動エネルギー計算
+            do i = 1, nummol(j)
+                typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
+                sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
+                typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
+            end do
+        end do
+    
         ! PtのPhantom層はダンパー力とランダム力を付与
         do j = 1, TYPMOL
             if(j == 2) then
                 cycle
             end if
-
+    
             do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層のみ
                 do k = 1, 3
                     rnd = Random() 
                     ! ランダム力
                     rndForce(i,k,j) = rnd * getStddev(tempLanPt(j)) * 1.000d-9 ! 標準偏差の有次元化
                     ! ダンパー力
-                    dmpForce(i,k,j) = - DAMP * typ(j)%mol(i)%vtmp(k) * 1.000d+5 ! 速度の有次元化
+                    dmpForce(i,k,j) = -DAMP * typ(j)%mol(i)%vtmp(k) * 1.000d+5 ! 速度の有次元化
                 end do
             end do
-
+    
             ! ランダム力とダンパー力を追加
             do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j))         ! 加速度の無次元化 10^-20
-                typ(j)%mol(i)%acc(:) = typ(j)%mol(i)%acc(:) + (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3 ! +26-20-9 = -3
+                typ(j)%mol(i)%acc(:) = typ(j)%mol(i)%acc(:) + (rndForce(i,:,j)*1.0d+9 + dmpForce(i,:,j)*1.0d+9) / MASS(j)*1.000d-3 ! -9+26-20 = -3
             end do
         end do
-
-        do j = 1, TYPMOL
-            ! 運動エネルギー計算
-            do i = 1, nummol(j)
-                typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt        ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
-                sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
-                typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
-            end do
     
+        do j = 1, TYPMOL
             ! Arの計算
             if(j == 2) then
                 ! 数値積分 (蛙跳び法)
@@ -698,52 +652,13 @@ program main
         end do
     end subroutine bound
 
-    subroutine calc_heatFlux
-        use parameters
-        use variable
-        use molecules_struct
-        implicit none
-        integer :: i, j, k
-
-        heatPhantom(:) = 0.000d0
-        heatSl_Lq = 0.000d0
-
-        do j = 1, TYPMOL
-            if (j == 2) then
-                cycle
-            else
-                do k = 1, 3
-                    do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層              ! 速さの有次元化 10^5
-                        heatPhantom(j) = heatPhantom(j) + (rndForce(i,k,j) + dmpForce(i,k,j))*typ(j)%mol(i)%vel(k)*1.000d+5
-                    end do
-                end do
-                        heatPhantom(j) = heatPhantom(j) / (areaPt * 1.000d-20) ! 面積の有次元化 10^-20
-            end if
-        end do
-
-        do j = 1, TYPMOL
-            if (j == 2) then
-                cycle
-            else
-                do k = 1, 3
-                    !do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
-                    do i = 1, nummol(2)
-                        heatSl_Lq(j) = heatSl_Lq(j) + interForce(i,k)*1.000d-10*typ(j)%mol(i)%vel(k)*1.000d+5
-                    end do
-                end do
-                        heatSl_Lq(j) = heatSl_Lq(j) / (areaPt * 1.000d-20)
-            end if
-        end do
-    
-    end subroutine calc_heatFlux
-
     subroutine record_pos_vel ! 位置，速度を記録
         use parameters
         use variable
         use molecules_struct
         implicit none
         integer :: i, j
-
+    
         do i = 1, nummol(1)
             ! posit_PtUp.dat
             write(10, '(I6, 3E15.7)') i, typ(1)%mol(i)%pos(1), typ(1)%mol(i)%pos(2), typ(1)%mol(i)%pos(3)
@@ -762,11 +677,15 @@ program main
             ! veloc_PtLw.dat
             write(22, '(I6, 3E15.7)') i, typ(3)%mol(i)%vel(1), typ(3)%mol(i)%vel(2), typ(3)%mol(i)%vel(3)
         end do
-
-        do i = int(nummol(1)/numz(1)) + 1, int(nummol(1) *2/numz(1))
-            write(70, '(9E15.7)') rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1), interForce(i,1), interForce(i,2), interForce(i,3)
+    
+        do i = int(nummol(1)/numz(1)) + 1, 2*int(nummol(1)/numz(1)) ! Phantom層
+            write(70, '(I6, 6E15.7)') i, rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1)
         end do
-
+    
+        do i = 1, nummol(1)!(numz(1)-1)*int(nummol(1)/numz(1)) + 1, nummol(1) ! 固液界面層
+            write(71, '(I6, 3E15.7)') i, interForce(i,1), interForce(i,2), interForce(i,3) ! 上Pt, Ar, 下Pt
+        end do
+    
         ! 可視化用
         do j = 1, TYPMOL
             do i = 1, nummol(j)
@@ -775,16 +694,20 @@ program main
             end do
         end do
     end subroutine record_pos_vel
-
+    
     subroutine record_energy_temp ! エネルギー，温度を記録
         use parameters
         use variable
         use molecules_struct
         implicit none
         double precision, dimension(TYPMOL) :: totEne, totPot, totKin, temp
-        double precision :: allEne, allPot, allKin, kintmp
+        double precision :: allEne, allPot, allKin
+        double precision :: kinPtTmp, kinArTmp(numDivAr)
+        integer :: cnt(numDivAr)
+        double precision :: tempLayerPt_(numz(1),TYPMOL)
+        double precision :: tempLayerAr_(numDivAr)
         integer :: i, j, k
-
+    
         allEne = 0.000d0
         allPot = 0.000d0
         allKin = 0.000d0
@@ -792,75 +715,152 @@ program main
         totPot(:) = 0.000d0
         totKin(:) = 0.000d0
         temp(:) = 0.000d0
-
+    
         do j = 1, TYPMOL
             ! ポテンシャル
             do i = 1, nummol(j)
                 totPot(j) = totPot(j) + typ(j)%mol(i)%poten
             end do
             totPot(j) = totPot(j) * 1.000d-16
-
+    
             ! 運動エネルギー
             if (j == 2) then
                 ! Ar
+                ! do i = 1, nummol(j)
+                !     totKin(j) = totKin(j) + typ(j)%mol(i)%kinet
+                ! end do
+                ! totKin(j) = totKin(j) * 1.000d-16
+                ! temp(j) = 2.0d0 * totKin(j) / (3.0d0 * dble(nummol(j)) * BOLTZ)
+    
+                kinArTmp(:) = 0.000d0
+                cnt(:) = 0
                 do i = 1, nummol(j)
-                    totKin(j) = totKin(j) + typ(j)%mol(i)%kinet
+                    do k = 1, numDivAr
+                        if ( (k-1)*zdiv <= (typ(j)%mol(i)%pos(3) - thick(3)) .and. (typ(j)%mol(i)%pos(3) - thick(3)) < k*zdiv) then
+                            kinArTmp(k) = kinArTmp(k) + typ(j)%mol(i)%kinet
+                            cnt(k) = cnt(k) + 1
+                            cycle
+                        end if
+                    end do
                 end do
-                totKin(j) = totKin(j) * 1.000d-16
-                temp(j) = 2.0d0 * totKin(j) / (3.0d0 * dble(nummol(j)) * BOLTZ)
+    
+                do k = 1, numDivAr
+                    kinArTmp(k) = kinArTmp(k) * 1.000d-16
+                    totKin(j) = totKin(j) + kinArtmp(k)
+                    tempLayerAr_(k) = 2.0d0 * kinArTmp(k) / (3.0d0 * dble(cnt(k)) * BOLTZ)
+                    temp(j) = temp(j) + tempLayerAr_(k)
+                end do
+    
+                temp(j) = temp(j) / dble(numDivAr)
             else
                 ! Pt
-                do k = 1, numz(j) ! Ptの層の数
-                    kintmp = 0.000d0
+                do k = 2, numz(j) ! Ptの層の数
+                    kinPtTmp = 0.000d0
                     do i = (k-1)*int(nummol(j)/numz(j)) + 1, k*int(nummol(j)/numz(j))
-                        kintmp = kintmp + typ(j)%mol(i)%kinet
+                        kinPtTmp = kinPtTmp + typ(j)%mol(i)%kinet
                     end do
-
-                    kintmp = kintmp * 1.000d-16
-                    tempLayer(k, j) = 2.0d0 * kintmp / (3.0d0 * dble(nummol(j)/numz(j)) * BOLTZ)
-
-                    if (k /= 1) then ! 固定層は除く
-                        temp(j) = temp(j) + tempLayer(k, j)
-                    end if
+    
+                    kinPtTmp = kinPtTmp * 1.000d-16
+                    totKin(j) = totKin(j) + kinPtTmp
+                    tempLayerPt_(k, j) = 2.0d0 * kinPtTmp / (3.0d0 * dble(nummol(j)/numz(j)) * BOLTZ)
+                    temp(j) = temp(j) + tempLayerPt_(k, j)
                 end do
-
+    
                 temp(j) = temp(j) / dble(numz(j)-1)
-
             end if
-
+    
             totEne(j) = totPot(j) + totKin(j)
             allEne = allEne + totEne(j)
             allPot = allPot + totPot(j)
             allKin = allKin + totKin(j)
-
         end do
-
+    
+        do j = 1, TYPMOL
+            if(j == 2) then
+                do i = 1, numDivAr
+                    tempLayerAr(i) = tempLayerAr(i) + tempLayerAr_(i)
+                end do
+            else
+                do i = 2, numz(j)
+                    tempLayerPt(i,j) = tempLayerPt(i,j) + tempLayerPt_(i,j)
+                end do
+            end if
+        end do
+    
         write(30, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(1), totPot(1), totKin(1)  ! energy_PtUp.dat
         write(31, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(2), totPot(2), totKin(2)  ! energy_Ar.dat
         write(32, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(3), totPot(3), totKin(3)  ! energy_PtLw.dat
         write(35, '(I6, 4E15.7)') (stpNow+99)*int(dt), allEne, allPot, allKin           ! energy_all.dat
         write(40, '(I6, 4E15.7)') (stpNow+99)*int(dt), temp(1), temp(2), temp(3)        ! tempe.dat
-
+    
         !!!!!!!!!Pt層を増やすとき必ず変更すること!!!!!!!!!
-        write(41, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayer(1,1), tempLayer(2,1), tempLayer(3,1), tempLayer(4,1)
-        write(42, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayer(1,3), tempLayer(2,3), tempLayer(3,3), tempLayer(4,3)
+        write(41, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayerPt_(1,1), tempLayerPt_(2,1), tempLayerPt_(3,1), tempLayerPt_(4,1)
+        write(42, '(I6, 15E15.7)') (stpNow+99)*int(dt), tempLayerAr_(1), tempLayerAr_(2), tempLayerAr_(3), tempLayerAr_(4), tempLayerAr_(5), tempLayerAr_(6), tempLayerAr_(7), tempLayerAr_(8), tempLayerAr_(9), tempLayerAr_(10), tempLayerAr_(11), tempLayerAr_(12), tempLayerAr_(13), tempLayerAr_(14), tempLayerAr_(15)
+        write(43, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayerPt_(1,3), tempLayerPt_(2,3), tempLayerPt_(3,3), tempLayerPt_(4,3)
     end subroutine record_energy_temp
-
-    subroutine record_heatflux ! 熱流束を記録
-        use parameters
-        use variable
-        use molecules_struct
-        implicit none
-
-        write(60,'(I6, 4E15.7)') (stpNow+99)*int(dt), heatPhantom(1), heatPhantom(3), heatSl_Lq(1), heatSl_Lq(3)
-    end subroutine record_heatflux
-
-    subroutine record_finpos_vel ! 最終状態の分子の位置と速度を記録
+    
+    subroutine record_pressure_heatflux ! 熱流束を記録
         use parameters
         use variable
         use molecules_struct
         implicit none
         integer :: i, j
+        integer :: stp
+        stp = stpNow-stpRelax
+    
+        pressure(:) = 0.000d0
+    
+        do j = 1, TYPMOL
+            if (j == 2) then
+                cycle
+            end if
+    
+            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層
+                
+                heatPhantom(j) = heatPhantom(j) + (rndForce(i,3,j) + dmpForce(i,3,j))*typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 速さの有次元化 10^5
+            end do
+    
+            ! do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
+            !     heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
+            ! end do
+    
+            do i = 1, nummol(j)
+                heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
+            end do
+            
+            do i = 1, nummol(j)
+                if(j == 1) then
+                    pressure(1) = pressure(1) + interForce(i,1)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6 ! [MPa]　圧力のオーダーはあってそう
+                else
+                    pressure(3) = pressure(3) - interForce(i,3)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6
+                end if
+            end do
+        end do
+    
+        write(60,'(I6, 6E15.7)') (stp)*int(dt), heatPhantom(1), heatPhantom(3), heatInterface(1), heatInterface(3)
+        write(61,'(I6, 3E15.7)') (stp)*int(dt), pressure(1), pressure(2), pressure(3)
+    end subroutine record_pressure_heatflux
+    
+    subroutine record_final ! 最終状態を記録
+        use parameters
+        use variable
+        use molecules_struct
+        implicit none
+        integer :: i, j
+        double precision :: disz
+    
+        do j = 1, TYPMOL
+            if(j == 2) then
+                do i = 1, numDivAr
+                    tempLayerAr(i) = tempLayerAr(i) / dble((stpMax)/100)
+                end do
+            else
+                do i = 2, numz(j)
+                    tempLayerPt(i,j) = tempLayerPt(i,j) / dble((stpMax)/100)
+                end do
+            end if
+        end do
+        
         do j = 1, TYPMOL
             do i = 1, nummol(j)
                 ! syuuki.dat
@@ -869,5 +869,25 @@ program main
                    typ(j)%mol(i)%vel(1), typ(j)%mol(i)%vel(2), typ(j)%mol(i)%vel(3)
             end do
         end do
-    end subroutine record_finpos_vel
+    
+        disz = STDIST(3)*0.25d0
+        do i = 1, numz(3)
+            disz = disz + STDIST(3)*0.5d0
+            write(45, '(2E15.7)') disz, tempLayerPt(i,3)
+        end do
+    
+        disz = disz - zdiv * 0.5d0
+        do i = 1, numDivAr
+            disz = disz + zdiv
+            write(45, '(2E15.7)') disz, tempLayerAr(i)
+        end do
+    
+        disz = zsyul0 - STDIST(1)*0.25d0
+        do i = 1, numz(1)
+            disz = disz - STDIST(1)*0.5d0
+            write(45, '(2E15.7)') disz, tempLayerPt(i,1)
+        end do
+    
+    
+    end subroutine record_final
 end program main
