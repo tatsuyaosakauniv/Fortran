@@ -2,15 +2,19 @@ module parameters
     implicit none
 !--------------- よく変更する---------------------!
     ! 計算時間
-    double precision, parameter :: timeScaling = 0.0025d0 ! スケーリング時間[ns]
-    double precision, parameter :: timeRelax   = 0.005d0 ! 緩和計算時間[ns]
-    double precision, parameter :: timeMeasure = 0.0225d0 ! データ計測時間[ns]
+    double precision, parameter :: timeScaling = 0.1d0 ! スケーリング時間[ns]
+    double precision, parameter :: timeRelax   = 0.5d0 ! 緩和計算時間[ns]
+    double precision, parameter :: timeMeasure = 5.0d0 ! データ計測時間[ns]
     double precision, parameter :: timeSum = timeScaling + timeRelax + timeMeasure ! 全計算時間
     
     double precision, parameter :: dt = 1.00d0 ! 無次元時間ステップ(無次元，有次元の場合fs)
     double precision, parameter :: tau = 20.0d0 ! 測定間隔[fs]
-    double precision, parameter :: tempAr = 150d0 ! 系内（目標）温度  K
-    double precision, parameter :: angCon = 0.05d0 ! 接触角
+
+    double precision, parameter :: tempAr = 110d0 ! 系内（目標）温度  K
+    double precision, parameter :: tempLanPt(TYPMOL) = [120d0, 0d0, 100d0] ! Langevin法を用いるPtの温度  真ん中は使わない
+    double precision, parameter :: angCon = 0.1d0 ! 接触角
+
+    character(len=20) :: dir_name = 'nemd'  ! ファイル名
 
     ! ステップ
     integer, parameter :: stpScaling = int(timeScaling/dt*1.0d+6) ! スケーリングステップ
@@ -21,14 +25,17 @@ module parameters
     ! 分子の数，配置
     integer, parameter :: TYPMOL = 3 ! 分子の種類数
     integer, parameter :: COMP = 3 ! 相互作用の組み合わせ数 = nC2
-    integer, parameter :: numx(TYPMOL) = [12, 8, 12]
-    integer, parameter :: numy(TYPMOL) = [ 6, 4,  6]
-    integer, parameter :: numz(TYPMOL) = [ 4, 18, 4]
+    integer, parameter :: numx(TYPMOL) = [10,6,10]
+    integer, parameter :: numy(TYPMOL) = [ 5, 3, 5]
+    integer, parameter :: numz(TYPMOL) = [ 4,20, 4]
     integer, parameter :: nummol(TYPMOL) = [numx(1)*numy(1)*numz(1), numx(2)*numy(2)*numz(2), numx(3)*numy(3)*numz(3)] ! 各分子の数
     
     ! 境界条件
     double precision, parameter :: STDIST(TYPMOL) = [3.92d0, 5.7d0, 3.92d0] ! 格子定数(無次元)[Å]
-    double precision, parameter :: thick(TYPMOL) = [STDIST(1)*(numz(1)*0.5d0+0.25d0), STDIST(2)*numz(2)*0.5d0, STDIST(3)*(numz(3)*0.5d0+0.25d0)]
+    double precision, parameter :: thick1 = STDIST(1)*(numz(1)*0.5d0+0.25d0)
+    double precision, parameter :: thick2 = STDIST(2)*numz(2)*0.5d0
+    double precision, parameter :: thick3 = STDIST(3)*(numz(3)*0.5d0+0.25d0)
+    double precision, parameter :: thick(TYPMOL) = [thick1, thick2, thick3]
     double precision, parameter :: xsyul0 = STDIST(1) * numy(1) ! x方向の周期境界長さ(無次元)
     double precision, parameter :: ysyul0 = STDIST(1) * numy(1) ! y方向の周期境界長さ(無次元）
     double precision, parameter :: zsyul0 = thick(1)+thick(2)+thick(3) ! z方向の周期境界長さ(無次元）
@@ -47,7 +54,6 @@ module parameters
     double precision, parameter :: EPS(COMP+1) = [109.2d-5, 1.666d-5, 109.2d-5, 13.49d-5] ! ε(無次元) *1.0d-16
 
     ! Langevin法
-    double precision, parameter :: tempLanPt(TYPMOL) = [200d0, 0d0, 100d0] ! Langevin法を用いるPtの温度  真ん中は使わない
     double precision, parameter :: DIRAC = 1.054571817d-34 ! ディラック定数 [J･s]
     double precision, parameter :: DEBTMP = 240d0 ! Debye温度 [K]
     double precision, parameter :: OMEGA = 3.14212728482d+13 ! BOLTZ * DEBTMP / DIRAC * 1.000d-11 ! Debye定数 (有次元)
@@ -81,10 +87,9 @@ module variable
 
     ! 熱流束
     double precision :: integrationTime ! 積算時間[fs]
-    double precision :: interForce(nummol(2), TYPMOL) ! 熱流束を計算するための相互作用力 z方向のみを使う
-    double precision :: heatPhantom(TYPMOL) = 0.000d0 ! Phantom層からの熱輸送量
-    double precision :: heatInterface(TYPMOL) = 0.000d0 ! 固液界面での熱輸送量
-    double precision :: fluxPt ! 熱流束
+    double precision :: interForce(nummol(1), 3, TYPMOL) ! 熱流束を計算するための相互作用力 z方向のみを使う
+    double precision :: heatPhantom(TYPMOL)! = 0.000d0 ! Phantom層からの熱輸送量
+    double precision :: heatInterface(TYPMOL)! = 0.000d0 ! 固液界面での熱輸送量
     double precision :: pressure(TYPMOL) ! 圧力
 
     double precision :: tempLayerPt(numz(1),TYPMOL) = 0.000d0 ! Ptの層ごとの温度

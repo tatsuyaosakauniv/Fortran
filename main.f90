@@ -1,56 +1,57 @@
 program main
     use parameters
-    use variable, !only: stpNow
+    use variable
     use molecules_struct
     use forPVwin
     implicit none
     integer :: i, j
+
+    ! 日付と時刻
+    character(len=8) :: date
+    character(len=10) :: time
+    character(len=100) :: filepath = '/home/kawaguchi/' // dir_name
 
     ! 配列初期化
     allocate(typ(1)%mol(nummol(1)))
     allocate(typ(2)%mol(nummol(2)))
     allocate(typ(3)%mol(nummol(3)))
 
-    ! 読み込み用乱数ファイル -> call random_numberを使えば良い？
-        !open(1,file='random0.dat', status='old')
-        !open(2,file='random1.dat', status='old')
-
         !open(6,*) は使用できない
     ! 各分子の位置データの出力
-        open(10,file='/Users/tatsuya/fortran/output/posit_PtUp.dat')
-        open(11,file='/Users/tatsuya/fortran/output/posit_Ar.dat')
-        open(12,file='/Users/tatsuya/fortran/output/posit_PtLw.dat')
+        open(10,file=trim(filepath) // '/posit_PtUp.dat')
+        open(11,file=trim(filepath) // '/posit_Ar.dat')
+        open(12,file=trim(filepath) // '/posit_PtLw.dat')
     ! 可視化用のpvch.fを移植 
-        open(15,file='/Users/tatsuya/fortran/exe/pos.dat')
+        open(15,file=trim(filepath) // '/pos.dat')
     ! 各分子の速度データの出力
-        open(20,file='/Users/tatsuya/fortran/output/veloc_PtUp.dat')
-        open(21,file='/Users/tatsuya/fortran/output/veloc_Ar.dat')
-        open(22,file='/Users/tatsuya/fortran/output/veloc_PtLw.dat')
+        open(20,file=trim(filepath) // '/veloc_PtUp.dat')
+        open(21,file=trim(filepath) // '/veloc_Ar.dat')
+        open(22,file=trim(filepath) // '/veloc_PtLw.dat')
     ! 系のエネルギーデータの出力
-        open(30,file='/Users/tatsuya/fortran/output/energy_PtUp.dat')
-        open(31,file='/Users/tatsuya/fortran/output/energy_Ar.dat')
-        open(32,file='/Users/tatsuya/fortran/output/energy_PtLw.dat')
-        open(35,file='/Users/tatsuya/fortran/output/energy_all.dat')
+        open(30,file=trim(filepath) // '/energy_PtUp.dat')
+        open(31,file=trim(filepath) // '/energy_Ar.dat')
+        open(32,file=trim(filepath) // '/energy_PtLw.dat')
+        open(35,file=trim(filepath) // '/energy_all.dat')
     ! 系の温度データの出力
-        open(40,file='/Users/tatsuya/fortran/output/tempe.dat')
-        open(41,file='/Users/tatsuya/fortran/output/tempe_PtUp_Layer.dat')
-        open(42,file='/Users/tatsuya/fortran/output/tempe_Ar_Layer.dat')
-        open(43,file='/Users/tatsuya/fortran/output/tempe_PtLw_Layer.dat')
+        open(40,file=trim(filepath) // '/tempe.dat')
+        open(41,file=trim(filepath) // '/tempe_PtUp_Layer.dat')
+        open(42,file=trim(filepath) // '/tempe_Ar_Layer.dat')
+        open(43,file=trim(filepath) // '/tempe_PtLw_Layer.dat')
         
-        open(45,file='/Users/tatsuya/fortran/output/tempe_Layer.dat')
+        open(45,file=trim(filepath) // '/tempe_Layer.dat')
     ! 系の周期長さの出力
-        open(50,file='/Users/tatsuya/fortran/output/syuuki.dat')
+        open(50,file=trim(filepath) // '/syuuki.dat')
     ! 熱流束のデータ
-        open(60,file='/Users/tatsuya/fortran/output/heatflux.dat')
-        open(61,file='/Users/tatsuya/fortran/output/pressure.dat')
+        open(60,file=trim(filepath) // '/heatflux.dat')
+        open(61,file=trim(filepath) // '/pressure.dat')
         
-        open(70,file='/Users/tatsuya/fortran/output/force_phantom.dat')
-        open(71,file='/Users/tatsuya/fortran/output/force_interface.dat')
+        open(70,file=trim(filepath) // '/force_phantom.dat')
+        open(71,file=trim(filepath) // '/force_interface.dat')
 
     ! 各分子の最終位置データの出力
-        open(80,file='/Users/tatsuya/fortran/output/finpos.dat')
+        open(80,file=trim(filepath) // '/finpos.dat')
     !　分子の色
-        open(90,file='/Users/tatsuya/fortran/exe/mask.dat')
+        open(90,file=trim(filepath) // '/mask.dat')
 
     write(15,'(3I7)') moltype, tlnkoss, ndat
     do i = 1,ndat
@@ -61,7 +62,7 @@ program main
             write(90,'(I7)') 14      ! 赤色
         end do
         do j = 1, nummol(2)
-            write(90,'(I7)') 1       ! 黄色
+            write(90,'(I7)') 7       ! 黄色
         end do
         do j = 1, int(nummol(3)/numz(3))
             write(90,'(I7)') 15      ! 白色
@@ -77,13 +78,10 @@ program main
     write(6, '(A17, F7.4, A2)') 'Relaxation Time: ', timeRelax, 'ns'
     write(6, '(A17, F7.4, A2)') 'Measure Time: ', timeMeasure, 'ns'
     write(6,*) ''
-    write(6,'(A16)') '- Scaling Step -'
+    write(6,*) '----------------------- Scaling Step -----------------------'
+    write(6,'(I8, A4)') stpScaling, 'step'
     write(6,*) '' 
     
-    write(6,*) stpScaling, stpRelax, stpMax
-    write(6,*) xsyul0, ysyul0, zsyul0
-    write(6,*) zdiv
-
     stpNow = 0
 
     call seting ! 各分子の初期位置，初期速度などの設定
@@ -92,14 +90,16 @@ program main
         stpNow = i
 
         ! ターミナルに表示
-        if(stpNow == stpScaling) then
+        if(stpNow == stpScaling+1) then
             write(6,*) ''
-            write(6,'(A19)') '- Relaxation Step -'
+            write(6,*) '---------------------- Relaxation Step ----------------------'
+            write(6,'(I8, A4)') stpRelax-stpScaling, 'step'
             write(6,*) ''
         end if
-        if(stpNow == stpRelax) then
+        if(stpNow == stpRelax+1) then
             write(6,*) ''
-            write(6,'(A16)') '- Measure Step -'
+            write(6,*) '----------------------- Measure Step ------------------------'
+            write(6,'(I8, A4)') stpMax-stpRelax, 'step'
             write(6,*) ''
         end if
 
@@ -136,13 +136,13 @@ program main
         use molecules_struct
         implicit none
         integer :: num, i, j, k
-        double precision :: coord(3) = 0.0000D0 ! xyz座標
+        double precision :: coord(3) = 0.0000d0 ! xyz座標
         double precision :: ofst(3)
         double precision :: ran, alpha, beta, cr
         double precision :: v(3)
 
         do i = 1, COMP
-            forCoef(i) = 24.00d0*EPS(i)/SIG(i)  ! 無次元なことに注意 *1.0d-6
+            forCoef(i) = 24.00d0*EPS(i)/SIG(i)  ! 無次元なことに注意 
         end do
             forCoef(4) = angCon*24.00d0*EPS(4)/SIG(4)
         

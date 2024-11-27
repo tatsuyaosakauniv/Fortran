@@ -25,11 +25,12 @@ subroutine record_pos_vel ! 位置，速度を記録
     end do
 
     do i = int(nummol(1)/numz(1)) + 1, 2*int(nummol(1)/numz(1)) ! Phantom層
-        write(70, '(I6, 6E15.7)') i, rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1)
+        write(70, '(I6, 6E15.7)') i, rndForce(i,1,1), rndForce(i,2,1), rndForce(i,3,1), &
+                                     dmpForce(i,1,1), dmpForce(i,2,1), dmpForce(i,3,1)
     end do
 
     do i = 1, nummol(1)!(numz(1)-1)*int(nummol(1)/numz(1)) + 1, nummol(1) ! 固液界面層
-        write(71, '(I6, 3E15.7)') i, interForce(i,1), interForce(i,2), interForce(i,3) ! 上Pt, Ar, 下Pt
+        write(71, '(I6, 3E15.7)') i, interForce(i,1,1), interForce(i,1,2), interForce(i,1,3) ! 上Pt, Ar, 下Pt
     end do
 
     ! 可視化用
@@ -53,6 +54,7 @@ subroutine record_energy_temp ! エネルギー，温度を記録
     double precision :: tempLayerPt_(numz(1),TYPMOL)
     double precision :: tempLayerAr_(numDivAr)
     integer :: i, j, k
+    ! integer :: stp = stpNow-stpRelax
 
     allEne = 0.000d0
     allPot = 0.000d0
@@ -133,16 +135,19 @@ subroutine record_energy_temp ! エネルギー，温度を記録
         end if
     end do
 
-    write(30, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(1), totPot(1), totKin(1)  ! energy_PtUp.dat
-    write(31, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(2), totPot(2), totKin(2)  ! energy_Ar.dat
-    write(32, '(I6, 4E15.7)') (stpNow+99)*int(dt), totEne(3), totPot(3), totKin(3)  ! energy_PtLw.dat
-    write(35, '(I6, 4E15.7)') (stpNow+99)*int(dt), allEne, allPot, allKin           ! energy_all.dat
-    write(40, '(I6, 4E15.7)') (stpNow+99)*int(dt), temp(1), temp(2), temp(3)        ! tempe.dat
+    write(30, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), totEne(1), totPot(1), totKin(1)  ! energy_PtUp.dat
+    write(31, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), totEne(2), totPot(2), totKin(2)  ! energy_Ar.dat
+    write(32, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), totEne(3), totPot(3), totKin(3)  ! energy_PtLw.dat
+    write(35, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), allEne, allPot, allKin           ! energy_all.dat
+    write(40, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), temp(1), temp(2), temp(3)        ! tempe.dat
 
     !!!!!!!!!Pt層を増やすとき必ず変更すること!!!!!!!!!
-    write(41, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayerPt_(1,1), tempLayerPt_(2,1), tempLayerPt_(3,1), tempLayerPt_(4,1)
-    write(42, '(I6, 15E15.7)') (stpNow+99)*int(dt), tempLayerAr_(1), tempLayerAr_(2), tempLayerAr_(3), tempLayerAr_(4), tempLayerAr_(5), tempLayerAr_(6), tempLayerAr_(7), tempLayerAr_(8), tempLayerAr_(9), tempLayerAr_(10), tempLayerAr_(11), tempLayerAr_(12), tempLayerAr_(13), tempLayerAr_(14), tempLayerAr_(15)
-    write(43, '(I6, 4E15.7)') (stpNow+99)*int(dt), tempLayerPt_(1,3), tempLayerPt_(2,3), tempLayerPt_(3,3), tempLayerPt_(4,3)
+    write(41, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), tempLayerPt_(1,1), tempLayerPt_(2,1), tempLayerPt_(3,1), tempLayerPt_(4,1)
+    write(42, '(I8, 15E15.7)') (stpNow-stpRelax)*int(dt), tempLayerAr_(1), tempLayerAr_(2), tempLayerAr_(3), tempLayerAr_(4)&
+                                                    , tempLayerAr_(5), tempLayerAr_(6), tempLayerAr_(7), tempLayerAr_(8)&
+                                                    , tempLayerAr_(9), tempLayerAr_(10), tempLayerAr_(11), tempLayerAr_(12)&
+                                                    , tempLayerAr_(13), tempLayerAr_(14), tempLayerAr_(15)
+    write(43, '(I8, 4E15.7)') (stpNow-stpRelax)*int(dt), tempLayerPt_(1,3), tempLayerPt_(2,3), tempLayerPt_(3,3), tempLayerPt_(4,3)
 end subroutine record_energy_temp
 
 subroutine record_pressure_heatflux ! 熱流束を記録
@@ -151,8 +156,8 @@ subroutine record_pressure_heatflux ! 熱流束を記録
     use molecules_struct
     implicit none
     integer :: i, j
-    integer :: stp
-    stp = stpNow-stpRelax
+    double precision :: heatfluxPhantom(TYPMOL) ! Phantom層からの熱輸送量
+    double precision :: heatfluxInterface(TYPMOL) ! 固液界面での熱輸送量
 
     pressure(:) = 0.000d0
 
@@ -161,30 +166,20 @@ subroutine record_pressure_heatflux ! 熱流束を記録
             cycle
         end if
 
-        do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層
-            
-            heatPhantom(j) = heatPhantom(j) + (rndForce(i,3,j) + dmpForce(i,3,j))*typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 速さの有次元化 10^5
-        end do
-
-        ! do i = (numz(j)-1)*int(nummol(j)/numz(j)) + 1, nummol(j) ! 固液界面層
-        !     heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
-        ! end do
-
-        do i = 1, nummol(j)
-            heatInterface(j) = heatInterface(j) + interForce(i,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3) * 1.000d+5 / (areaPt * 1.000d-20) * tau * 1.000d-15 ! 面積の有次元化 10^-20
-        end do
+        heatfluxPhantom(j) = heatPhantom(j) / (areaPt * 1.000d-20) * 1.000d-15 ! 速さの有次元化 10^5
+        heatfluxInterface(j) = heatInterface(j) / (areaPt * 1.000d-20) * 1.000d-15 ! 面積の有次元化 10^-20
         
         do i = 1, nummol(j)
             if(j == 1) then
-                pressure(1) = pressure(1) + interForce(i,1)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6 ! [MPa]　圧力のオーダーはあってそう
+                pressure(1) = pressure(1) + interForce(i,3,1)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6 ! [MPa]　圧力のオーダーはあってそう
             else
-                pressure(3) = pressure(3) - interForce(i,3)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6
+                pressure(3) = pressure(3) - interForce(i,3,3)*1.000d-6 / (areaPt * 1.000d-20) *1.000d-6
             end if
         end do
     end do
 
-    write(60,'(I6, 6E15.7)') (stp)*int(dt), heatPhantom(1), heatPhantom(3), heatInterface(1), heatInterface(3)
-    write(61,'(I6, 3E15.7)') (stp)*int(dt), pressure(1), pressure(2), pressure(3)
+    write(60,'(I6, 8E15.7)') (stpNow-stpRelax)*int(dt), heatfluxPhantom(1), heatfluxPhantom(3), heatfluxInterface(1), heatfluxInterface(3)
+    write(61,'(I6, 3E15.7)') (stpNow-stpRelax)*int(dt), pressure(1), pressure(2), pressure(3)
 end subroutine record_pressure_heatflux
 
 subroutine record_final ! 最終状態を記録
@@ -198,11 +193,11 @@ subroutine record_final ! 最終状態を記録
     do j = 1, TYPMOL
         if(j == 2) then
             do i = 1, numDivAr
-                tempLayerAr(i) = tempLayerAr(i) / dble((stpMax)/100)
+                tempLayerAr(i) = tempLayerAr(i) / dble((stpMax-stpRelax)/(tau/dt))
             end do
         else
             do i = 2, numz(j)
-                tempLayerPt(i,j) = tempLayerPt(i,j) / dble((stpMax)/100)
+                tempLayerPt(i,j) = tempLayerPt(i,j) / dble((stpMax-stpRelax)/(tau/dt))
             end do
         end if
     end do

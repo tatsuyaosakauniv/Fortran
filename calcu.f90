@@ -17,7 +17,7 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
             typ(j)%mol(i)%kinet  = 0.0000d0
         end do
     end do
-    interForce(:,:) = 0.000d0
+    interForce(:,:,:) = 0.000d0
 
     ! 分子間の相互作用力 → ポテンシャルエネルギー
     ! 同じ分子同士の影響
@@ -106,20 +106,11 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
 
                 force  = forCoef(4)*(-2.00d0/dit14+1.00d0/dit8)
                 forVec(:) = -force*div(:)
-                interForce(i1,j) = interForce(i1,j) - forVec(3) ! 無次元なことに注意　符号が逆な気がする
+                interForce(i1,:,j) = interForce(i1,:,j) - forVec(:) ! 無次元なことに注意　符号が逆な気がする
 
                 typ(j)%mol(i1)%acc(:) = typ(j)%mol(i1)%acc(:) + forVec(:)/MASS(j)
                 typ(2)%mol(i2)%acc(:) = typ(2)%mol(i2)%acc(:) - forVec(:)/MASS(2)
             end do
-        end do
-    end do
-
-    do j = 1, TYPMOL
-        ! 運動エネルギー計算
-        do i = 1, nummol(j)
-            typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
-            sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
-            typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
         end do
     end do
 
@@ -145,10 +136,41 @@ subroutine calcu ! 各分子に働く力，速度，位置の分子動力学計�
         end do
     end do
 
+    ! 運動エネルギー計算
+    do j = 1, TYPMOL
+        do i = 1, nummol(j)
+            typ(j)%mol(i)%vtmp(:) = typ(j)%mol(i)%vel(:) + typ(j)%mol(i)%acc(:)*0.500d0*dt ! vel(t) = vel(t-dt/2) + acc(t)*dt/2
+            sumvene = typ(j)%mol(i)%vtmp(1)**2 + typ(j)%mol(i)%vtmp(2)**2 + typ(j)%mol(i)%vtmp(3)**2
+            typ(j)%mol(i)%kinet = 0.500d0*MASS(j)*sumvene
+        end do
+    end do
+
+    ! 熱流束（未完成）を積算
+    if(stpNow > stpRelax) then
+        do j = 1, TYPMOL
+            if(stpNow == stpRelax+1) then   ! パラメータモジュールで初期化するとうまくいかなかったのでここで初期化
+                heatPhantom(:) = 0.000d0
+                heatInterface(:) = 0.000d0
+            end if
+
+            if (j == 2) then
+                cycle
+            end if
+    
+            do i = int(nummol(j)/numz(j)) + 1, 2*int(nummol(j)/numz(j)) ! Phantom層  
+                heatPhantom(j) = heatPhantom(j) + ((rndForce(i,1,j) + dmpForce(i,1,j))*typ(j)%mol(i)%vtmp(1) +  (rndForce(i,2,j) + dmpForce(i,2,j))*typ(j)%mol(i)%vtmp(2) + (rndForce(i,3,j) + dmpForce(i,3,j))*typ(j)%mol(i)%vtmp(3)) * 1.000d+5 ! 速さの有次元化 10^5
+            end do
+    
+            do i = 1, nummol(j) ! Pt分子全体
+                heatInterface(j) = heatInterface(j) + (interForce(i,1,j)*1.000d-6 * typ(j)%mol(i)%vtmp(1)*1.000d+5 + interForce(i,2,j)*1.000d-6 * typ(j)%mol(i)%vtmp(2)*1.000d+5 + interForce(i,3,j)*1.000d-6 * typ(j)%mol(i)%vtmp(3)*1.000d+5)
+            end do
+        end do
+    end if
+
+    ! 数値積分 (蛙跳び法)
     do j = 1, TYPMOL
         ! Arの計算
         if(j == 2) then
-            ! 数値積分 (蛙跳び法)
             do i = 1, nummol(2)
                 typ(2)%mol(i)%vel(:) = typ(2)%mol(i)%vel(:) + typ(2)%mol(i)%acc(:) * dt   ! vel(t+dt/2) = vel(t-dt/2) + acc(t)*dt
                 typ(2)%mol(i)%pos(:) = typ(2)%mol(i)%pos(:) + typ(2)%mol(i)%vel(:) * dt   ! pos(t+dt)   = pos(t)      + vel(t+dt/2)*dt
